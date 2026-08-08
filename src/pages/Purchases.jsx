@@ -13,13 +13,11 @@ import Modal from '../components/ui/Modal';
 import DataTable from '../components/ui/DataTable';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  getDemoPurchases,
-  registerDemoPurchase,
   getPurchasesRealtime,
   registerPurchase,
 } from '../services/purchaseService';
 import { getProductsRealtime } from '../services/productService';
-import { getDemoProducts } from '../data/demoData';
+
 import { formatCurrency, formatDate } from '../utils/formatters';
 import toast from 'react-hot-toast';
 
@@ -43,12 +41,7 @@ const Purchases = () => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user?.isDemo) {
-      setProducts(getDemoProducts());
-      setPurchases(getDemoPurchases());
-      setLoading(false);
-      return;
-    }
+
     const unsubProducts = getProductsRealtime((data) => { setProducts(data); setLoading(false); });
     const unsubPurchases = getPurchasesRealtime(setPurchases);
     return () => { unsubProducts(); unsubPurchases(); };
@@ -76,17 +69,9 @@ const Purchases = () => {
     setSubmitting(true);
     try {
       const productName = selectedProduct?.name || '';
-      if (user?.isDemo) {
-        const newPurchase = registerDemoPurchase(
-          { ...form, productName, totalCost, updateCostPrice: form.updateCostPrice },
-          setProducts
-        );
-        setPurchases((prev) => [newPurchase, ...prev]);
-        toast.success(`${qty} par${qty !== 1 ? 'es' : ''} de "${productName}" adicionado${qty !== 1 ? 's' : ''} ao estoque!`);
-      } else {
-        await registerPurchase({ ...form, productName, totalCost });
-        toast.success(`Compra registrada! Estoque atualizado.`);
-      }
+
+      await registerPurchase({ ...form, productName, totalCost });
+      toast.success(`Compra registrada! Estoque atualizado.`);
       setModalOpen(false);
       setForm(EMPTY_FORM);
     } catch (err) {

@@ -9,7 +9,7 @@ import {
   deleteProduct,
 } from '../services/productService';
 import { useAuth } from '../contexts/AuthContext';
-import { getDemoProducts, saveDemoProducts } from '../data/demoData';
+
 import { formatCurrency } from '../utils/formatters';
 import toast from 'react-hot-toast';
 
@@ -32,11 +32,6 @@ const Products = () => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user?.isDemo) {
-      setProducts(getDemoProducts());
-      setLoading(false);
-      return;
-    }
     const unsub = getProductsRealtime((data) => {
       setProducts(data);
       setLoading(false);
@@ -71,31 +66,6 @@ const Products = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      if (user?.isDemo) {
-        let newProducts;
-        if (selected) {
-          newProducts = getDemoProducts().map((p) =>
-            p.id === selected.id
-              ? { ...p, ...form, costPrice: Number(form.costPrice), salePrice: Number(form.salePrice), stock: Number(form.stock) }
-              : p
-          );
-          toast.success('Produto atualizado! (demo)');
-        } else {
-          const newProduct = {
-            id: `demo-${Date.now()}`,
-            ...form,
-            costPrice: Number(form.costPrice),
-            salePrice: Number(form.salePrice),
-            stock: Number(form.stock),
-          };
-          newProducts = [newProduct, ...getDemoProducts()];
-          toast.success('Produto cadastrado! (demo)');
-        }
-        saveDemoProducts(newProducts);
-        setProducts(newProducts);
-        setModalOpen(false);
-        return;
-      }
       if (selected) {
         await updateProduct(selected.id, form);
         toast.success('Produto atualizado!');
@@ -115,14 +85,6 @@ const Products = () => {
   const handleDelete = async () => {
     setSubmitting(true);
     try {
-      if (user?.isDemo) {
-        const newProducts = getDemoProducts().filter((p) => p.id !== selected.id);
-        saveDemoProducts(newProducts);
-        setProducts(newProducts);
-        toast.success('Produto excluído! (demo)');
-        setDeleteModalOpen(false);
-        return;
-      }
       await deleteProduct(selected.id);
       toast.success('Produto excluído!');
       setDeleteModalOpen(false);

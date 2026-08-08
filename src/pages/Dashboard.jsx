@@ -22,17 +22,12 @@ import StatusBadge from '../components/ui/StatusBadge';
 import RevenueChart from '../components/charts/RevenueChart';
 import Modal from '../components/ui/Modal';
 import { useAuth } from '../contexts/AuthContext';
-import { getDemoSales, getDemoProducts } from '../data/demoData';
-import { getDemoPurchases } from '../services/purchaseService';
+
 import { getSalesRealtime } from '../services/salesService';
 import { getProductsRealtime } from '../services/productService';
 import { getPurchasesRealtime } from '../services/purchaseService';
 import { getFinancialSettings, saveFinancialSettings } from '../services/settingsService';
 import {
-  getDemoReminders,
-  addDemoReminder,
-  updateDemoReminder,
-  deleteDemoReminder,
   getRemindersRealtime,
   toggleReminderDone,
   deleteReminder,
@@ -58,16 +53,7 @@ const Dashboard = () => {
 
   // Load data
   useEffect(() => {
-    if (user?.isDemo) {
-      setSales(getDemoSales());
-      setProducts(getDemoProducts());
-      setPurchases(getDemoPurchases());
-      setLoadingSales(false);
-      const saved = localStorage.getItem(CAPITAL_KEY);
-      if (saved) setCapitalInicial(Number(saved));
-      setReminders(getDemoReminders());
-      return;
-    }
+
     const unsubSales = getSalesRealtime((data) => { setSales(data); setLoadingSales(false); });
     const unsubProducts = getProductsRealtime(setProducts);
     const unsubPurchases = getPurchasesRealtime(setPurchases);
@@ -81,11 +67,7 @@ const Dashboard = () => {
     setSavingCapital(true);
     const valor = Number(capitalInput) || 0;
     try {
-      if (user?.isDemo) {
-        localStorage.setItem(CAPITAL_KEY, String(valor));
-      } else {
-        await saveFinancialSettings({ capitalInicial: valor });
-      }
+      await saveFinancialSettings({ capitalInicial: valor });
       setCapitalInicial(valor);
       setCapitalModal(false);
       toast.success('Capital inicial salvo!');
@@ -97,21 +79,11 @@ const Dashboard = () => {
   };
 
   const handleToggleReminder = (rem) => {
-    if (user?.isDemo) {
-      updateDemoReminder(rem.id, { done: !rem.done });
-      setReminders(getDemoReminders());
-    } else {
-      toggleReminderDone(rem.id, rem.done);
-    }
+    toggleReminderDone(rem.id, rem.done);
   };
 
   const handleDeleteReminder = (id) => {
-    if (user?.isDemo) {
-      deleteDemoReminder(id);
-      setReminders(getDemoReminders());
-    } else {
-      deleteReminder(id);
-    }
+    deleteReminder(id);
     toast.success('Lembrete removido!');
   };
 

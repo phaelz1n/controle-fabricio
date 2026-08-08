@@ -5,25 +5,13 @@ import { loginWithEmail, logout as logoutService } from '../services/authService
 
 const AuthContext = createContext(null);
 
-const DEMO_USER = {
-  uid: 'demo-user',
-  email: 'demo@fabricio.com',
-  displayName: 'Modo Demo',
-  isDemo: true,
-};
+
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if demo mode is active
-    const isDemoActive = sessionStorage.getItem('demo_mode') === 'true';
-    if (isDemoActive) {
-      setUser(DEMO_USER);
-      setLoading(false);
-      return;
-    }
 
     let unsubscribe;
     try {
@@ -42,13 +30,8 @@ export const AuthProvider = ({ children }) => {
     return await loginWithEmail(email, password);
   };
 
-  const loginDemo = () => {
-    sessionStorage.setItem('demo_mode', 'true');
-    setUser(DEMO_USER);
-  };
 
   const logout = async () => {
-    sessionStorage.removeItem('demo_mode');
     try {
       await logoutService();
     } catch {
@@ -58,7 +41,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginDemo, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

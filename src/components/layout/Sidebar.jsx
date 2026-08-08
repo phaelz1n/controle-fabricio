@@ -7,7 +7,6 @@ import {
   LogOut,
   TrendingUp,
   ChevronRight,
-  FlaskConical,
   ShoppingBag,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -47,12 +46,6 @@ const Sidebar = () => {
             <p className="text-xs text-slate-500">de Vendas</p>
           </div>
         </div>
-        {user?.isDemo && (
-          <div className="mt-3 flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-            <FlaskConical size={12} className="text-amber-400" />
-            <span className="text-xs font-semibold text-amber-400">Modo Demo</span>
-          </div>
-        )}
       </div>
 
       {/* Nav */}

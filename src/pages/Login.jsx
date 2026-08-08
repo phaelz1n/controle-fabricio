@@ -5,9 +5,9 @@ import { TrendingUp, Mail, Lock, Eye, EyeOff, AlertCircle, FlaskConical } from '
 import toast from 'react-hot-toast';
 
 const Login = () => {
-  const { login, loginDemo, user } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { login, user } = useAuth();
+  const [email, setEmail] = useState('admin@mrdstore.com.br');
+  const [password, setPassword] = useState('admin');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,16 +29,11 @@ const Login = () => {
           ? 'Muitas tentativas. Tente novamente mais tarde.'
           : err.code === 'auth/user-not-found'
           ? 'Usuário não encontrado.'
-          : 'Firebase não configurado. Use o modo demo para testar.';
+          : 'Erro ao fazer login. Verifique as credenciais.';
       setError(msg);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemo = () => {
-    loginDemo();
-    toast.success('Modo demo ativado! Explore à vontade 🎉');
   };
 
   return (
@@ -55,33 +50,6 @@ const Login = () => {
           </div>
           <h1 className="text-2xl font-bold text-slate-100">Controle de Vendas</h1>
           <p className="text-sm text-slate-400 mt-1">Entre na sua conta para continuar</p>
-        </div>
-
-        {/* Demo Banner */}
-        <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl flex items-start gap-2.5">
-          <FlaskConical size={15} className="text-amber-400 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-xs font-semibold text-amber-300">Modo Demo disponível</p>
-            <p className="text-xs text-amber-400/70 mt-0.5">
-              Explore o sistema com dados fictícios sem precisar configurar o Firebase.
-            </p>
-          </div>
-        </div>
-
-        {/* Demo Button */}
-        <button
-          id="btn-demo"
-          onClick={handleDemo}
-          className="w-full mb-4 flex items-center justify-center gap-2 px-4 py-3 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-sm font-semibold rounded-xl transition-all duration-200 active:scale-95"
-        >
-          <FlaskConical size={16} />
-          Entrar em Modo Demo
-        </button>
-
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex-1 h-px bg-slate-800" />
-          <span className="text-xs text-slate-600">ou entre com sua conta</span>
-          <div className="flex-1 h-px bg-slate-800" />
         </div>
 
         {/* Card */}

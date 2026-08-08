@@ -9,7 +9,7 @@ import {
   deleteCustomer,
 } from '../services/customerService';
 import { useAuth } from '../contexts/AuthContext';
-import { getDemoCustomers, saveDemoCustomers } from '../data/demoData';
+
 import { getInitials } from '../utils/formatters';
 import toast from 'react-hot-toast';
 
@@ -32,11 +32,6 @@ const Customers = () => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user?.isDemo) {
-      setCustomers(getDemoCustomers());
-      setLoading(false);
-      return;
-    }
     const unsub = getCustomersRealtime((data) => {
       setCustomers(data);
       setLoading(false);
@@ -71,20 +66,6 @@ const Customers = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      if (user?.isDemo) {
-        let newCustomers;
-        if (selected) {
-          newCustomers = getDemoCustomers().map((c) => (c.id === selected.id ? { ...c, ...form } : c));
-          toast.success('Cliente atualizado! (demo)');
-        } else {
-          newCustomers = [{ id: `demo-${Date.now()}`, ...form }, ...getDemoCustomers()];
-          toast.success('Cliente cadastrado! (demo)');
-        }
-        saveDemoCustomers(newCustomers);
-        setCustomers(newCustomers);
-        setModalOpen(false);
-        return;
-      }
       if (selected) {
         await updateCustomer(selected.id, form);
         toast.success('Cliente atualizado!');
@@ -103,14 +84,6 @@ const Customers = () => {
   const handleDelete = async () => {
     setSubmitting(true);
     try {
-      if (user?.isDemo) {
-        const newCustomers = getDemoCustomers().filter((c) => c.id !== selected.id);
-        saveDemoCustomers(newCustomers);
-        setCustomers(newCustomers);
-        toast.success('Cliente excluído! (demo)');
-        setDeleteModalOpen(false);
-        return;
-      }
       await deleteCustomer(selected.id);
       toast.success('Cliente excluído!');
       setDeleteModalOpen(false);

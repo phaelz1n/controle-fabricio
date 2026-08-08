@@ -14,11 +14,7 @@ import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/ui/StatusBadge';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  getDemoSales, saveDemoSales,
-  getDemoProducts, saveDemoProducts,
-  getDemoCustomers,
-} from '../data/demoData';
+
 import {
   getSalesRealtime,
   createSale,
@@ -27,10 +23,6 @@ import {
 import { getProductsRealtime } from '../services/productService';
 import { getCustomersRealtime } from '../services/customerService';
 import {
-  getDemoReminders,
-  addDemoReminder,
-  updateDemoReminder,
-  deleteDemoReminder,
   getRemindersRealtime,
   addReminder,
   toggleReminderDone,
@@ -71,19 +63,10 @@ const Sales = () => {
   const [submitting, setSubmitting] = useState(false);
   const [statusFilter, setStatusFilter] = useState('Todos');
 
-  const { user } = useAuth();
 
-  const refreshDemoReminders = () => setReminders(getDemoReminders());
 
   useEffect(() => {
-    if (user?.isDemo) {
-      setSales(getDemoSales());
-      setProducts(getDemoProducts());
-      setCustomers(getDemoCustomers());
-      setLoading(false);
-      refreshDemoReminders();
-      return;
-    }
+
     const unsubSales = getSalesRealtime((data) => { setSales(data); setLoading(false); });
     const unsubProducts = getProductsRealtime(setProducts);
     const unsubCustomers = getCustomersRealtime(setCustomers);
@@ -134,39 +117,7 @@ const Sales = () => {
     if (selectedProduct.stock <= 0) { toast.error('Produto sem estoque disponível!'); return; }
     setSubmitting(true);
     try {
-      if (user?.isDemo) {
-        const paid = Number(form.amountPaid) || 0;
-        const price = selectedProduct.salePrice;
-        const cost = selectedProduct.costPrice;
-        const rem = Math.max(0, price - paid);
-        const status = paid <= 0 ? 'Pendente' : paid >= price ? 'Total Pago' : 'Pago Parcial';
-        const newSale = {
-          id: `demo-sale-${Date.now()}`,
-          date: form.date, // Store as string for easy serialization
-          customerId: form.customerId,
-          customerName: selectedCustomer?.name || '',
-          productId: form.productId,
-          productName: selectedProduct.name,
-          costPrice: cost, salePrice: price, profit: price - cost,
-          amountPaid: paid, remainingBalance: rem, paymentStatus: status,
-          paymentMethod: form.paymentMethod, weekLabel: form.weekLabel,
-        };
-        
-        const newSalesList = [newSale, ...getDemoSales()];
-        saveDemoSales(newSalesList);
-        setSales(newSalesList);
-        
-        const newProductsList = getDemoProducts().map((p) => 
-          p.id === form.productId ? { ...p, stock: p.stock - 1 } : p
-        );
-        saveDemoProducts(newProductsList);
-        setProducts(newProductsList);
-        
-        toast.success('Venda registrada! (demo)');
-        setNewSaleModal(false);
-        setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel() });
-        return;
-      }
+
       await createSale({
         customerId: form.customerId, customerName: selectedCustomer?.name || '',
         productId: form.productId, productName: selectedProduct.name,
@@ -188,21 +139,7 @@ const Sales = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      if (user?.isDemo) {
-        const amount = Number(paymentAmount) || 0;
-        const newSalesList = getDemoSales().map((s) => {
-          if (s.id !== selectedSale.id) return s;
-          const newPaid = (s.amountPaid || 0) + amount;
-          const newRem = Math.max(0, (s.salePrice || 0) - newPaid);
-          const newStatus = newPaid <= 0 ? 'Pendente' : newPaid >= s.salePrice ? 'Total Pago' : 'Pago Parcial';
-          return { ...s, amountPaid: newPaid, remainingBalance: newRem, paymentStatus: newStatus };
-        });
-        saveDemoSales(newSalesList);
-        setSales(newSalesList);
-        toast.success('Pagamento registrado! (demo)');
-        setPaymentModal(false); setPaymentAmount('');
-        return;
-      }
+
       await registerPayment(selectedSale.id, paymentAmount, selectedSale);
       toast.success('Pagamento registrado!');
       setPaymentModal(false); setPaymentAmount('');
@@ -226,12 +163,7 @@ const Sales = () => {
       amountToCollect: Number(reminderForm.amountToCollect) || 0,
     };
     try {
-      if (user?.isDemo) {
-        addDemoReminder(data);
-        refreshDemoReminders();
-      } else {
-        await addReminder(data);
-      }
+      await addReminder(data);
       toast.success('Lembrete criado!');
       setReminderModal(false);
     } catch {
@@ -242,13 +174,11 @@ const Sales = () => {
   };
 
   const handleToggleReminder = (rem) => {
-    if (user?.isDemo) { updateDemoReminder(rem.id, { done: !rem.done }); refreshDemoReminders(); }
-    else toggleReminderDone(rem.id, rem.done);
+    toggleReminderDone(rem.id, rem.done);
   };
 
   const handleDeleteReminder = (id) => {
-    if (user?.isDemo) { deleteDemoReminder(id); refreshDemoReminders(); }
-    else deleteReminder(id);
+    deleteReminder(id);
     toast.success('Lembrete removido!');
   };
 
