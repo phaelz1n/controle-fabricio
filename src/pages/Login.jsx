@@ -22,8 +22,9 @@ const Login = () => {
       await login(email, password);
       toast.success('Bem-vindo de volta!');
     } catch (err) {
+      console.error("Firebase Login Error:", err.code, err.message);
       const msg =
-        err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password'
+        err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-login-credentials'
           ? 'Email ou senha incorretos.'
           : err.code === 'auth/too-many-requests'
           ? 'Muitas tentativas. Tente novamente mais tarde.'
