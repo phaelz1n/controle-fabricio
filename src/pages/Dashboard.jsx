@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   Trash2,
   CalendarClock,
+  Printer,
+  Filter,
 } from 'lucide-react';
 import MetricCard from '../components/ui/MetricCard';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -50,6 +52,7 @@ const Dashboard = () => {
   const [capitalModal, setCapitalModal] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
   const [savingCapital, setSavingCapital] = useState(false);
+  const [dateFilter, setDateFilter] = useState('all');
 
   // Load data
   useEffect(() => {
@@ -87,20 +90,54 @@ const Dashboard = () => {
     toast.success('Lembrete removido!');
   };
 
+  // ── Filtros ──────────────────────────────────────────────────────────
+  const filteredSales = useMemo(() => {
+    const today = new Date();
+    return sales.filter((s) => {
+      if (dateFilter === 'all') return true;
+      const d = new Date(s.date || s.createdAt);
+      if (dateFilter === 'today') return d.toDateString() === today.toDateString();
+      if (dateFilter === 'month') return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+      if (dateFilter === 'year') return d.getFullYear() === today.getFullYear();
+      return true;
+    });
+  }, [sales, dateFilter]);
+
+  const filteredPurchases = useMemo(() => {
+    const today = new Date();
+    return purchases.filter((p) => {
+      if (dateFilter === 'all') return true;
+      const d = new Date(p.date || p.createdAt);
+      if (dateFilter === 'today') return d.toDateString() === today.toDateString();
+      if (dateFilter === 'month') return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+      if (dateFilter === 'year') return d.getFullYear() === today.getFullYear();
+      return true;
+    });
+  }, [purchases, dateFilter]);
+
   // ── Financial calculations ────────────────────────────────────────────
   const finance = useMemo(() => {
-    const totalGastoCompras = purchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
-    const totalRecebido = sales.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
+    const totalGastoCompras = filteredPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+    const totalRecebido = filteredSales.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
+    
+    const aReceber = filteredSales.reduce((sum, s) => sum + (s.remainingBalance || 0), 0);
+    const lucroRealizado = filteredSales.reduce((sum, s) => {
+      const paid = s.amountPaid || 0;
+      const cost = s.costPrice || 0;
+      if (paid <= 0) return sum;
+      const ratio = s.salePrice > 0 ? Math.min(paid / s.salePrice, 1) : 0;
+      return sum + paid - cost * ratio;
+    }, 0);
     
     const caixaAtual = capitalInicial - totalGastoCompras + totalRecebido;
     
     return { totalRecebido, totalGastoCompras, aReceber, lucroRealizado, caixaAtual };
-  }, [sales, purchases, capitalInicial]);
+  }, [filteredSales, filteredPurchases, capitalInicial]);
 
   // ── Top Compradores ───────────────────────────────────────────────────
   const topBuyers = useMemo(() => {
     const map = {};
-    sales.forEach((s) => {
+    filteredSales.forEach((s) => {
       const key = s.customerId || s.customerName;
       if (!map[key]) map[key] = { name: s.customerName, totalPaid: 0, totalDebt: 0, count: 0 };
       map[key].totalPaid += s.amountPaid || 0;
@@ -110,7 +147,7 @@ const Dashboard = () => {
     return Object.values(map)
       .sort((a, b) => (b.totalPaid + b.totalDebt) - (a.totalPaid + a.totalDebt))
       .slice(0, 5);
-  }, [sales]);
+  }, [filteredSales]);
 
   // ── Reminders split ───────────────────────────────────────────────────
   const today = new Date();
@@ -120,22 +157,54 @@ const Dashboard = () => {
 
   const chartData = useMemo(() => {
     const map = {};
-    sales.forEach((s) => {
+    filteredSales.forEach((s) => {
       const key = s.weekLabel || formatShortDate(s.date || s.createdAt);
       if (!map[key]) map[key] = { label: key, receita: 0, lucro: 0 };
       map[key].receita += s.amountPaid || 0;
       map[key].lucro += (s.amountPaid || 0) - (s.costPrice || 0);
     });
     return Object.values(map).slice(-8).reverse();
-  }, [sales]);
+  }, [filteredSales]);
 
-  const recentSales = sales.slice(0, 8);
+  const recentSales = filteredSales.slice(0, 8);
 
   const medalColors = ['text-amber-400', 'text-slate-300', 'text-amber-600'];
   const medalBg = ['bg-amber-500/10 border-amber-500/20', 'bg-slate-500/10 border-slate-500/20', 'bg-amber-700/10 border-amber-700/20'];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in print:space-y-4">
+
+      {/* ── HEADER DA DASHBOARD (Filtros & Exportação) ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+        <div className="flex items-center gap-2">
+          <Filter size={18} className="text-violet-400" />
+          <h2 className="text-lg font-bold text-slate-100">Filtro:</h2>
+          <select 
+            className="input-field py-1.5 px-3 w-40 font-medium"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          >
+            <option value="all">Todo o Período</option>
+            <option value="today">Hoje</option>
+            <option value="month">Este Mês</option>
+            <option value="year">Este Ano</option>
+          </select>
+        </div>
+        
+        <button 
+          onClick={() => window.print()}
+          className="btn-secondary"
+        >
+          <Printer size={16} />
+          Exportar Relatório PDF
+        </button>
+      </div>
+
+      {/* Título apenas para Impressão */}
+      <div className="hidden print:block mb-4 text-center">
+        <h1 className="text-2xl font-bold">Relatório Financeiro</h1>
+        <p className="text-sm">Período: {dateFilter === 'today' ? 'Hoje' : dateFilter === 'month' ? 'Este Mês' : dateFilter === 'year' ? 'Este Ano' : 'Todo o Período'}</p>
+      </div>
 
       {/* ── POSIÇÃO FINANCEIRA ── */}
       <div className="glass-card p-5">
@@ -149,7 +218,7 @@ const Dashboard = () => {
           </div>
           <button
             onClick={() => { setCapitalInput(String(capitalInicial || '')); setCapitalModal(true); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-violet-300 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-violet-300 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all print:hidden"
           >
             <Settings size={13} />
             {capitalInicial > 0 ? 'Editar capital' : 'Definir capital inicial'}
@@ -177,7 +246,7 @@ const Dashboard = () => {
               <p className="text-xs text-amber-400/80">A Receber</p>
             </div>
             <p className="text-lg font-bold text-amber-300">{formatCurrency(finance.aReceber)}</p>
-            <p className="text-xs text-slate-600 mt-1">{sales.filter((s) => s.paymentStatus !== 'Total Pago').length} venda(s) em aberto</p>
+            <p className="text-xs text-slate-600 mt-1">{filteredSales.filter((s) => s.paymentStatus !== 'Total Pago').length} venda(s) em aberto</p>
           </div>
           <div className={`p-4 rounded-xl border ${finance.caixaAtual >= 0 ? 'bg-emerald-500/10 border-emerald-500/25' : 'bg-rose-500/10 border-rose-500/25'}`}>
             <div className="flex items-center gap-1 mb-1">
@@ -203,9 +272,9 @@ const Dashboard = () => {
 
       {/* ── KPI CARDS ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <MetricCard title="Total Recebido" value={formatCurrency(finance.totalRecebido)} icon={DollarSign} color="violet" subtitle={`${sales.length} venda(s) no total`} />
+        <MetricCard title="Total Recebido" value={formatCurrency(finance.totalRecebido)} icon={DollarSign} color="violet" subtitle={`${filteredSales.length} venda(s) no total`} />
         <MetricCard title="Lucro Realizado" value={formatCurrency(finance.lucroRealizado)} icon={TrendingUp} color="emerald" subtitle="Receita menos custo das vendas pagas" />
-        <MetricCard title="A Receber" value={formatCurrency(finance.aReceber)} icon={Clock} color="amber" subtitle={`${sales.filter((s) => s.paymentStatus !== 'Total Pago').length} vendas em aberto`} />
+        <MetricCard title="A Receber" value={formatCurrency(finance.aReceber)} icon={Clock} color="amber" subtitle={`${filteredSales.filter((s) => s.paymentStatus !== 'Total Pago').length} vendas em aberto`} />
       </div>
 
       {/* ── TOP COMPRADORES + LEMBRETES ── */}
