@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Trash2,
   Pencil,
+  X,
 } from 'lucide-react';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -59,13 +60,38 @@ const Sales = () => {
   const [selectedSaleForEdit, setSelectedSaleForEdit] = useState(null);
 
   const [form, setForm] = useState({
-    customerId: '', productId: '', amountPaid: '',
+    customerId: '', amountPaid: '',
     paymentMethod: 'PIX',
     date: new Date().toISOString().split('T')[0],
     weekLabel: getCurrentWeekLabel(),
-    size: '',
-    customPrice: '',
+    items: [{ id: 'init', productId: '', size: '', customPrice: '', costPrice: 0, name: '' }],
   });
+
+  const addItem = () => {
+    setForm(f => ({ ...f, items: [...f.items, { id: Date.now().toString(), productId: '', size: '', customPrice: '', costPrice: 0, name: '' }] }));
+  };
+  
+  const updateItem = (id, field, value) => {
+    setForm(f => ({ ...f, items: f.items.map(i => i.id === id ? { ...i, [field]: value } : i) }));
+  };
+  
+  const removeItem = (id) => {
+    setForm(f => ({ ...f, items: f.items.filter(i => i.id !== id) }));
+  };
+
+  const handleProductChange = (id, pId) => {
+    const prod = products.find(p => p.id === pId);
+    setForm(f => ({
+      ...f,
+      items: f.items.map(i => i.id === id ? {
+        ...i, 
+        productId: pId, 
+        customPrice: prod ? String(prod.salePrice) : '',
+        costPrice: prod ? prod.costPrice : 0,
+        name: prod ? prod.name : ''
+      } : i)
+    }));
+  };
 
   const [paymentAmount, setPaymentAmount] = useState('');
   const [reminderForm, setReminderForm] = useState({ dueDate: '', note: '', amountToCollect: '' });
@@ -83,15 +109,16 @@ const Sales = () => {
     return () => { unsubSales(); unsubProducts(); unsubCustomers(); unsubReminders(); };
   }, [user]);
 
-  const selectedProduct = products.find((p) => p.id === form.productId);
   const selectedCustomer = customers.find((c) => c.id === form.customerId);
 
   const amountPaid = Number(form.amountPaid) || 0;
-  const salePrice = form.customPrice !== '' ? Number(form.customPrice) : (selectedProduct?.salePrice || 0);
-  const costPrice = selectedProduct?.costPrice || 0;
-  const remaining = Math.max(0, salePrice - amountPaid);
-  const profit = salePrice - costPrice;
-  const payStatus = amountPaid <= 0 ? 'Pendente' : amountPaid >= salePrice ? 'Total Pago' : 'Pago Parcial';
+  
+  const totalCost = form.items.reduce((sum, item) => sum + (Number(item.costPrice) || 0), 0);
+  const totalSale = form.items.reduce((sum, item) => sum + (item.customPrice !== '' ? Number(item.customPrice) : 0), 0);
+  
+  const remaining = Math.max(0, totalSale - amountPaid);
+  const profit = totalSale - totalCost;
+  const payStatus = amountPaid <= 0 ? 'Pendente' : amountPaid >= totalSale ? 'Total Pago' : 'Pago Parcial';
 
   const filteredSales = useMemo(() => {
     if (statusFilter === 'Todos') return sales;
@@ -125,15 +152,28 @@ const Sales = () => {
       const d = sale.date.toDate ? sale.date.toDate() : new Date(sale.date);
       dateStr = d.toISOString().split('T')[0];
     }
+    let items = sale.items || [];
+    if (items.length === 0 && sale.productId) {
+      items = [{
+        id: '1',
+        productId: sale.productId,
+        name: sale.productName || '',
+        size: sale.size || '',
+        customPrice: String(sale.salePrice || ''),
+        costPrice: sale.costPrice || 0,
+      }];
+    }
+    if (items.length === 0) {
+      items = [{ id: 'init', productId: '', size: '', customPrice: '', costPrice: 0, name: '' }];
+    }
+
     setForm({
       customerId: sale.customerId || '',
-      productId: sale.productId || '',
       amountPaid: String(sale.amountPaid || ''),
       paymentMethod: sale.paymentMethod || 'PIX',
       date: dateStr,
       weekLabel: sale.weekLabel || '',
-      size: sale.size || '',
-      customPrice: String(sale.salePrice || ''),
+      items,
     });
     setNewSaleModal(true);
   };
@@ -159,16 +199,35 @@ const Sales = () => {
   const handleNewSale = async (e) => {
     e.preventDefault();
     if (!form.customerId) { toast.error('Selecione um cliente.'); return; }
-    if (!form.productId) { toast.error('Selecione um produto.'); return; }
-    if (!selectedProduct) return;
+    
+    const validItems = form.items.filter(i => i.productId);
+    if (validItems.length === 0) { toast.error('Adicione pelo menos um produto.'); return; }
+
     setSubmitting(true);
     try {
+      const firstItemName = validItems[0].name;
+      const productNameDisplay = validItems.length > 1 
+        ? `${firstItemName} + ${validItems.length - 1} item(s)`
+        : firstItemName;
+
       const data = {
-        customerId: form.customerId, customerName: selectedCustomer?.name || '',
-        productId: form.productId, productName: selectedProduct.name,
-        costPrice: selectedProduct.costPrice, salePrice: salePrice,
+        customerId: form.customerId, 
+        customerName: selectedCustomer?.name || '',
+        productId: validItems.length === 1 ? validItems[0].productId : 'multiple', 
+        productName: productNameDisplay,
+        size: validItems.length === 1 ? validItems[0].size : '',
+        costPrice: totalCost, 
+        salePrice: totalSale,
+        items: validItems.map(i => ({
+          productId: i.productId,
+          productName: i.name,
+          size: i.size,
+          costPrice: i.costPrice,
+          salePrice: Number(i.customPrice) || 0,
+          profit: (Number(i.customPrice) || 0) - i.costPrice
+        })),
         amountPaid: form.amountPaid, paymentMethod: form.paymentMethod,
-        date: form.date, weekLabel: form.weekLabel, size: form.size,
+        date: form.date, weekLabel: form.weekLabel,
       };
 
       if (selectedSaleForEdit) {
@@ -179,7 +238,7 @@ const Sales = () => {
         toast.success('Venda registrada com sucesso!');
       }
       setNewSaleModal(false);
-      setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), size: '', customPrice: '' });
+      setForm({ customerId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), items: [{ id: 'init', productId: '', size: '', customPrice: '', costPrice: 0, name: '' }] });
       setSelectedSaleForEdit(null);
     } catch (err) {
       toast.error(err.message || 'Erro ao registrar venda.');
@@ -258,7 +317,7 @@ const Sales = () => {
           <h2 className="text-xl font-bold text-slate-100">Vendas</h2>
           <p className="text-sm text-slate-400 mt-0.5">{sales.length} venda{sales.length !== 1 ? 's' : ''} registrada{sales.length !== 1 ? 's' : ''}</p>
         </div>
-        <button id="btn-add-sale" onClick={() => { setSelectedSaleForEdit(null); setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), size: '', customPrice: '' }); setNewSaleModal(true); }} className="btn-primary">
+        <button id="btn-add-sale" onClick={() => { setSelectedSaleForEdit(null); setForm({ customerId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), items: [{ id: 'init', productId: '', size: '', customPrice: '', costPrice: 0, name: '' }] }); setNewSaleModal(true); }} className="btn-primary">
           <Plus size={16} />Nova Venda
         </button>
       </div>
@@ -367,65 +426,82 @@ const Sales = () => {
               required
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
-              <label className="label">Produto *</label>
-              <SearchableSelect
-                placeholder="Selecionar produto..."
-                value={form.productId}
-                onChange={(val) => {
-                  const prod = products.find(p => p.id === val);
-                  setForm((f) => ({ ...f, productId: val, customPrice: prod ? prod.salePrice : '' }));
-                }}
-                options={products.map(p => ({ 
-                  value: p.id, 
-                  label: p.name, 
-                  sublabel: formatCurrency(p.salePrice) 
-                }))}
-                required
-              />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="label mb-0">Produtos *</label>
+              <button type="button" onClick={addItem} className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1 font-semibold">
+                <Plus size={14} /> Adicionar Produto
+              </button>
             </div>
-            <div>
-              <label className="label">Tamanho / Num.</label>
-              <input className="input-field" placeholder="ex: 38" value={form.size}
-                onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))} />
+            
+            <div className="space-y-3">
+              {form.items.map((item) => {
+                const itemCost = Number(item.costPrice) || 0;
+                const itemSale = Number(item.customPrice) || 0;
+                
+                return (
+                  <div key={item.id} className="p-3 bg-slate-800/40 border border-slate-700/50 rounded-xl space-y-3 relative">
+                    {form.items.length > 1 && (
+                      <button type="button" onClick={() => removeItem(item.id)} className="absolute -top-2 -right-2 w-6 h-6 bg-rose-500/20 text-rose-400 rounded-full flex items-center justify-center hover:bg-rose-500/40 transition-colors z-10">
+                        <X size={12} />
+                      </button>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2">
+                        <SearchableSelect
+                          placeholder="Selecionar produto..."
+                          value={item.productId}
+                          onChange={(val) => handleProductChange(item.id, val)}
+                          options={products.map(p => ({ value: p.id, label: p.name, sublabel: formatCurrency(p.salePrice) }))}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <input className="input-field" placeholder="Tam/Num (opcional)" value={item.size}
+                          onChange={(e) => updateItem(item.id, 'size', e.target.value)} />
+                      </div>
+                    </div>
+                    {item.productId && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-1 block">Preço de Venda (R$)</label>
+                          <input type="number" min="0" step="0.01" className="input-field py-1.5 text-sm" 
+                            value={item.customPrice} 
+                            onChange={(e) => updateItem(item.id, 'customPrice', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-1 block">Margem (%)</label>
+                          <input type="number" step="0.1" className="input-field py-1.5 text-sm" 
+                            value={itemCost > 0 ? ((itemSale - itemCost) / itemCost * 100).toFixed(1) : ''}
+                            onChange={(e) => {
+                              const newMargin = Number(e.target.value);
+                              const newPrice = itemCost + (itemCost * newMargin / 100);
+                              updateItem(item.id, 'customPrice', newPrice.toFixed(2));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
-          {selectedProduct && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">Preço de Venda (R$)</label>
-                  <input type="number" min="0" step="0.01" className="input-field" 
-                    value={form.customPrice} 
-                    onChange={(e) => setForm(f => ({...f, customPrice: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="label">Margem (%)</label>
-                  <input type="number" step="0.1" className="input-field" 
-                    value={costPrice > 0 ? ((salePrice - costPrice) / costPrice * 100).toFixed(1) : ''}
-                    onChange={(e) => {
-                      const newMargin = Number(e.target.value);
-                      const newPrice = costPrice + (costPrice * newMargin / 100);
-                      setForm(f => ({...f, customPrice: newPrice.toFixed(2)}));
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                <div className="text-center"><p className="text-xs text-slate-500">Custo</p><p className="text-sm font-semibold text-slate-300">{formatCurrency(costPrice)}</p></div>
-                <div className="text-center"><p className="text-xs text-slate-500">Venda</p><p className="text-sm font-semibold text-violet-300">{formatCurrency(salePrice)}</p></div>
-                <div className="text-center"><p className="text-xs text-slate-500">Lucro</p><p className="text-sm font-semibold text-emerald-400">{formatCurrency(profit)}</p></div>
-              </div>
-            </>
+
+          {form.items.some(i => i.productId) && (
+            <div className="grid grid-cols-3 gap-2 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 mt-2">
+              <div className="text-center"><p className="text-xs text-slate-500">Custo Total</p><p className="text-sm font-semibold text-slate-300">{formatCurrency(totalCost)}</p></div>
+              <div className="text-center"><p className="text-xs text-slate-500">Venda Total</p><p className="text-sm font-semibold text-violet-300">{formatCurrency(totalSale)}</p></div>
+              <div className="text-center"><p className="text-xs text-slate-500">Lucro Total</p><p className="text-sm font-semibold text-emerald-400">{formatCurrency(profit)}</p></div>
+            </div>
           )}
           <div>
             <label className="label">Cliente Pagou (R$)</label>
             <input type="number" min="0" step="0.01" className="input-field" placeholder="0,00"
               value={form.amountPaid} onChange={(e) => setForm((f) => ({ ...f, amountPaid: e.target.value }))} />
           </div>
-          {selectedProduct && (
+          {form.items.some(i => i.productId) && (
             <div className="grid grid-cols-2 gap-2">
               <div className="p-2.5 bg-slate-800/50 rounded-xl text-center">
                 <p className="text-xs text-slate-500">Restante</p>
