@@ -7,8 +7,10 @@ import {
   Smartphone,
   Bell,
   BellPlus,
+  BellPlus,
   CheckCircle2,
   Trash2,
+  Pencil,
 } from 'lucide-react';
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
@@ -18,7 +20,10 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   getSalesRealtime,
   createSale,
+  createSale,
   registerPayment,
+  updateSale,
+  deleteSale,
 } from '../services/salesService';
 import { getProductsRealtime } from '../services/productService';
 import { getCustomersRealtime } from '../services/customerService';
@@ -49,8 +54,11 @@ const Sales = () => {
 
   const [newSaleModal, setNewSaleModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
+  const [paymentModal, setPaymentModal] = useState(false);
   const [reminderModal, setReminderModal] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
+  const [selectedSaleForEdit, setSelectedSaleForEdit] = useState(null);
 
   const [form, setForm] = useState({
     customerId: '', productId: '', amountPaid: '',
@@ -111,6 +119,43 @@ const Sales = () => {
     setReminderModal(true);
   };
 
+  const openEdit = (sale) => {
+    setSelectedSaleForEdit(sale);
+    let dateStr = '';
+    if (sale.date) {
+      const d = sale.date.toDate ? sale.date.toDate() : new Date(sale.date);
+      dateStr = d.toISOString().split('T')[0];
+    }
+    setForm({
+      customerId: sale.customerId || '',
+      productId: sale.productId || '',
+      amountPaid: String(sale.amountPaid || ''),
+      paymentMethod: sale.paymentMethod || 'PIX',
+      date: dateStr,
+      weekLabel: sale.weekLabel || '',
+      size: sale.size || '',
+    });
+    setNewSaleModal(true);
+  };
+
+  const openDelete = (sale) => {
+    setSelectedSaleForEdit(sale);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteSale = async () => {
+    setSubmitting(true);
+    try {
+      await deleteSale(selectedSaleForEdit.id);
+      toast.success('Venda excluída!');
+      setDeleteModalOpen(false);
+    } catch {
+      toast.error('Erro ao excluir venda.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleNewSale = async (e) => {
     e.preventDefault();
     if (!form.customerId) { toast.error('Selecione um cliente.'); return; }
@@ -118,17 +163,24 @@ const Sales = () => {
     if (!selectedProduct) return;
     setSubmitting(true);
     try {
-
-      await createSale({
+      const data = {
         customerId: form.customerId, customerName: selectedCustomer?.name || '',
         productId: form.productId, productName: selectedProduct.name,
         costPrice: selectedProduct.costPrice, salePrice: selectedProduct.salePrice,
         amountPaid: form.amountPaid, paymentMethod: form.paymentMethod,
         date: form.date, weekLabel: form.weekLabel, size: form.size,
-      });
-      toast.success('Venda registrada com sucesso!');
+      };
+
+      if (selectedSaleForEdit) {
+        await updateSale(selectedSaleForEdit.id, data);
+        toast.success('Venda atualizada!');
+      } else {
+        await createSale(data);
+        toast.success('Venda registrada com sucesso!');
+      }
       setNewSaleModal(false);
       setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), size: '' });
+      setSelectedSaleForEdit(null);
     } catch (err) {
       toast.error(err.message || 'Erro ao registrar venda.');
     } finally {
@@ -206,7 +258,7 @@ const Sales = () => {
           <h2 className="text-xl font-bold text-slate-100">Vendas</h2>
           <p className="text-sm text-slate-400 mt-0.5">{sales.length} venda{sales.length !== 1 ? 's' : ''} registrada{sales.length !== 1 ? 's' : ''}</p>
         </div>
-        <button id="btn-add-sale" onClick={() => setNewSaleModal(true)} className="btn-primary">
+        <button id="btn-add-sale" onClick={() => { setSelectedSaleForEdit(null); setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), size: '' }); setNewSaleModal(true); }} className="btn-primary">
           <Plus size={16} />Nova Venda
         </button>
       </div>
@@ -269,6 +321,21 @@ const Sales = () => {
                 ) : (
                   <span className="text-xs text-slate-600 px-3">Quitado</span>
                 )}
+
+                <button
+                  onClick={() => openEdit(row)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 transition-all ml-1"
+                  title="Editar"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => openDelete(row)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
+                  title="Excluir"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             )}
           />
@@ -276,7 +343,7 @@ const Sales = () => {
       </div>
 
       {/* ── MODAL NOVA VENDA ── */}
-      <Modal isOpen={newSaleModal} onClose={() => setNewSaleModal(false)} title="Registrar Nova Venda" size="lg">
+      <Modal isOpen={newSaleModal} onClose={() => { setNewSaleModal(false); setSelectedSaleForEdit(null); }} title={selectedSaleForEdit ? 'Editar Venda' : 'Registrar Nova Venda'} size="lg">
         <form onSubmit={handleNewSale} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -353,12 +420,38 @@ const Sales = () => {
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => setNewSaleModal(false)} className="btn-secondary flex-1">Cancelar</button>
+            <button type="button" onClick={() => { setNewSaleModal(false); setSelectedSaleForEdit(null); }} className="btn-secondary flex-1">Cancelar</button>
             <button type="submit" disabled={submitting} className="btn-primary flex-1">
-              {submitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Confirmar Venda'}
+              {submitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : selectedSaleForEdit ? 'Salvar' : 'Confirmar Venda'}
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* ── MODAL EXCLUIR VENDA ── */}
+      <Modal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Excluir Venda" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-300">
+            Tem certeza que deseja excluir esta venda para{' '}
+            <strong className="text-slate-100">"{selectedSaleForEdit?.customerName}"</strong>?
+            <br />
+            <span className="text-rose-400 text-xs mt-1 block">
+              Esta ação não pode ser desfeita e os lembretes também serão apagados.
+            </span>
+          </p>
+          <div className="flex gap-3">
+            <button onClick={() => setDeleteModalOpen(false)} className="btn-secondary flex-1">
+              Cancelar
+            </button>
+            <button onClick={handleDeleteSale} disabled={submitting} className="btn-danger flex-1">
+              {submitting ? (
+                <div className="w-4 h-4 border-2 border-rose-400/30 border-t-rose-400 rounded-full animate-spin" />
+              ) : (
+                'Excluir'
+              )}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* ── MODAL RECEBER PAGAMENTO ── */}

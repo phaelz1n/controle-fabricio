@@ -8,6 +8,10 @@ import {
   runTransaction,
   doc,
   Timestamp,
+  deleteDoc,
+  updateDoc,
+  getDocs,
+  where,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -88,4 +92,21 @@ export const registerPurchase = async (data) => {
   });
 };
 
+export const updatePurchase = async (id, data) => {
+  const ref = doc(db, PURCHASES_COL, id);
+  const qty = Number(data.quantity) || 0;
+  const unitCost = Number(data.unitCost) || 0;
+  return await updateDoc(ref, {
+    ...data,
+    quantity: qty,
+    unitCost: unitCost,
+    totalCost: qty * unitCost,
+  });
+};
 
+export const deletePurchase = async (id) => {
+  await deleteDoc(doc(db, PURCHASES_COL, id));
+  const q = query(collection(db, CASHFLOW_COL), where('purchaseId', '==', id));
+  const snapshot = await getDocs(q);
+  snapshot.forEach((d) => deleteDoc(d.ref));
+};

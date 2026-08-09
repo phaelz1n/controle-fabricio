@@ -15,6 +15,9 @@ import toast from 'react-hot-toast';
 
 const EMPTY_FORM = {
   name: '',
+  model: '',
+  color: '',
+  brand: '',
   category: '',
   costPrice: '',
   salePrice: '',
@@ -48,6 +51,9 @@ const Products = () => {
     setSelected(product);
     setForm({
       name: product.name || '',
+      model: product.model || '',
+      color: product.color || '',
+      brand: product.brand || '',
       category: product.category || '',
       costPrice: String(product.costPrice || ''),
       salePrice: String(product.salePrice || ''),
@@ -64,11 +70,16 @@ const Products = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
+      const dataToSave = {
+        ...form,
+        name: form.model ? `${form.brand ? form.brand + ' ' : ''}${form.model}${form.color ? ` - ${form.color}` : ''}` : form.name,
+        category: form.brand || form.category,
+      };
       if (selected) {
-        await updateProduct(selected.id, form);
+        await updateProduct(selected.id, dataToSave);
         toast.success('Produto atualizado!');
       } else {
-        await addProduct(form);
+        await addProduct(dataToSave);
         toast.success('Produto cadastrado!');
       }
       setModalOpen(false);
@@ -101,8 +112,10 @@ const Products = () => {
       label: 'Produto',
       render: (row) => (
         <div>
-          <p className="font-medium text-slate-200">{row.name}</p>
-          <p className="text-xs text-slate-500">{row.category || '—'}</p>
+          <p className="font-medium text-slate-200">
+            {row.model ? `${row.brand ? row.brand + ' ' : ''}${row.model}${row.color ? ` - ${row.color}` : ''}` : row.name}
+          </p>
+          <p className="text-xs text-slate-500">{row.brand || row.category || '—'}</p>
         </div>
       ),
     },
@@ -187,24 +200,35 @@ const Products = () => {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="label">Nome do Produto *</label>
+            <label className="label">Modelo *</label>
             <input
               className="input-field"
-              placeholder="ex: Nike Air Force (Marrom)"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="ex: Air Force"
+              value={form.model}
+              onChange={(e) => setForm((f) => ({ ...f, model: e.target.value, name: e.target.value }))}
               required
             />
           </div>
 
-          <div>
-            <label className="label">Categoria / Marca</label>
-            <input
-              className="input-field"
-              placeholder="ex: Nike, Adidas, New Balance..."
-              value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Cor</label>
+              <input
+                className="input-field"
+                placeholder="ex: Marrom"
+                value={form.color}
+                onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="label">Marca</label>
+              <input
+                className="input-field"
+                placeholder="ex: Nike"
+                value={form.brand}
+                onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value, category: e.target.value }))}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

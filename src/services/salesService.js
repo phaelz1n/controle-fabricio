@@ -10,6 +10,8 @@ import {
   runTransaction,
   Timestamp,
   getDocs,
+  deleteDoc,
+  where,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -178,3 +180,11 @@ export const getCashflowRealtime = (callback) => {
     callback(entries);
   });
 };
+
+export const deleteSale = async (id) => {
+  await deleteDoc(doc(db, SALES_COLLECTION, id));
+  const q = query(collection(db, CASHFLOW_COLLECTION), where('saleId', '==', id));
+  const snapshot = await getDocs(q);
+  snapshot.forEach((d) => deleteDoc(d.ref));
+};
+

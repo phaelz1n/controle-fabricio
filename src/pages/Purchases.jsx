@@ -7,14 +7,20 @@ import {
   CalendarDays,
   Store,
   RefreshCw,
+  RefreshCw,
   CheckCircle,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import DataTable from '../components/ui/DataTable';
 import { useAuth } from '../contexts/AuthContext';
 import {
   getPurchasesRealtime,
+  getPurchasesRealtime,
   registerPurchase,
+  updatePurchase,
+  deletePurchase,
 } from '../services/purchaseService';
 import { getProductsRealtime } from '../services/productService';
 
@@ -38,6 +44,8 @@ const Purchases = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
 
@@ -60,6 +68,44 @@ const Purchases = () => {
     return { totalInvested, totalUnits };
   }, [purchases]);
 
+  const openEdit = (purchase) => {
+    setSelectedPurchase(purchase);
+    let dateStr = '';
+    if (purchase.date) {
+      const d = purchase.date.toDate ? purchase.date.toDate() : new Date(purchase.date);
+      dateStr = d.toISOString().split('T')[0];
+    }
+    setForm({
+      productId: purchase.productId || '',
+      quantity: String(purchase.quantity || ''),
+      unitCost: String(purchase.unitCost || ''),
+      supplier: purchase.supplier || '',
+      notes: purchase.notes || '',
+      date: dateStr,
+      updateCostPrice: false,
+      size: purchase.size || '',
+    });
+    setModalOpen(true);
+  };
+
+  const openDelete = (purchase) => {
+    setSelectedPurchase(purchase);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    setSubmitting(true);
+    try {
+      await deletePurchase(selectedPurchase.id);
+      toast.success('Compra excluída!');
+      setDeleteModalOpen(false);
+    } catch {
+      toast.error('Erro ao excluir compra.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.productId) { toast.error('Selecione um produto.'); return; }
@@ -70,16 +116,23 @@ const Purchases = () => {
     try {
       const productName = selectedProduct?.name || '';
 
-      await registerPurchase({ ...form, productName, totalCost });
-      toast.success(`Compra registrada! Estoque atualizado.`);
+      if (selectedPurchase) {
+        await updatePurchase(selectedPurchase.id, { ...form, productName, totalCost });
+        toast.success('Compra atualizada!');
+      } else {
+        await registerPurchase({ ...form, productName, totalCost });
+        toast.success(`Compra registrada! Estoque atualizado.`);
+      }
       setModalOpen(false);
       setForm(EMPTY_FORM);
+      setSelectedPurchase(null);
     } catch (err) {
       toast.error(err.message || 'Erro ao registrar compra.');
     } finally {
       setSubmitting(false);
     }
   };
+
 
   const columns = [
     {
@@ -140,7 +193,7 @@ const Purchases = () => {
             Registre compras para atualizar o estoque e o fluxo de caixa automaticamente
           </p>
         </div>
-        <button id="btn-add-purchase" onClick={() => setModalOpen(true)} className="btn-primary">
+        <button id="btn-add-purchase" onClick={() => { setSelectedPurchase(null); setForm(EMPTY_FORM); setModalOpen(true); }} className="btn-primary">
           <Plus size={16} />
           Registrar Compra
         </button>
@@ -186,6 +239,24 @@ const Purchases = () => {
             searchKeys={['productName', 'supplier', 'notes']}
             emptyMessage="Nenhuma compra registrada ainda. Clique em 'Registrar Compra' para começar."
             pageSize={8}
+            actions={(row) => (
+              <>
+                <button
+                  onClick={() => openEdit(row)}
+                  className="p-2 rounded-lg text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 transition-all"
+                  title="Editar"
+                >
+                  <Pencil size={15} />
+                </button>
+                <button
+                  onClick={() => openDelete(row)}
+                  className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
+                  title="Excluir"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </>
+            )}
           />
         )}
       </div>
@@ -193,8 +264,8 @@ const Purchases = () => {
       {/* ── MODAL REGISTRAR COMPRA ── */}
       <Modal
         isOpen={modalOpen}
-        onClose={() => { setModalOpen(false); setForm(EMPTY_FORM); }}
-        title="Registrar Nova Compra"
+        onClose={() => { setModalOpen(false); setForm(EMPTY_FORM); setSelectedPurchase(null); }}
+        title={selectedPurchase ? 'Editar Compra' : 'Registrar Nova Compra'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -362,17 +433,48 @@ const Purchases = () => {
           )}
 
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={() => { setModalOpen(false); setForm(EMPTY_FORM); }} className="btn-secondary flex-1">
+            <button type="button" onClick={() => { setModalOpen(false); setForm(EMPTY_FORM); setSelectedPurchase(null); }} className="btn-secondary flex-1">
               Cancelar
             </button>
             <button type="submit" disabled={submitting} className="btn-primary flex-1">
               {submitting
                 ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <><ShoppingBag size={15} />Registrar Compra</>
+                : selectedPurchase ? 'Salvar' : <><ShoppingBag size={15} />Registrar Compra</>
               }
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* ── MODAL EXCLUIR COMPRA ── */}
+      <Modal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title="Excluir Compra"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-300">
+            Tem certeza que deseja excluir esta compra de{' '}
+            <strong className="text-slate-100">"{selectedPurchase?.productName}"</strong>?
+            <br />
+            <span className="text-rose-400 text-xs mt-1 block">
+              Esta ação não pode ser desfeita.
+            </span>
+          </p>
+          <div className="flex gap-3">
+            <button onClick={() => setDeleteModalOpen(false)} className="btn-secondary flex-1">
+              Cancelar
+            </button>
+            <button onClick={handleDelete} disabled={submitting} className="btn-danger flex-1">
+              {submitting ? (
+                <div className="w-4 h-4 border-2 border-rose-400/30 border-t-rose-400 rounded-full animate-spin" />
+              ) : (
+                'Excluir'
+              )}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
