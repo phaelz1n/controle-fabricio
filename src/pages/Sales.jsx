@@ -14,6 +14,7 @@ import {
 import DataTable from '../components/ui/DataTable';
 import Modal from '../components/ui/Modal';
 import StatusBadge from '../components/ui/StatusBadge';
+import SearchableSelect from '../components/ui/SearchableSelect';
 import { useAuth } from '../contexts/AuthContext';
 
 import {
@@ -358,28 +359,31 @@ const Sales = () => {
           </div>
           <div>
             <label className="label">Cliente *</label>
-            <select className="input-field" value={form.customerId}
-              onChange={(e) => setForm((f) => ({ ...f, customerId: e.target.value }))} required>
-              <option value="">Selecionar cliente...</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <SearchableSelect
+              placeholder="Selecionar cliente..."
+              value={form.customerId}
+              onChange={(val) => setForm((f) => ({ ...f, customerId: val }))}
+              options={customers.map(c => ({ value: c.id, label: c.name }))}
+              required
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
               <label className="label">Produto *</label>
-              <select className="input-field" value={form.productId}
-                onChange={(e) => {
-                  const pId = e.target.value;
-                  const prod = products.find(p => p.id === pId);
-                  setForm((f) => ({ ...f, productId: pId, customPrice: prod ? prod.salePrice : '' }));
-                }} required>
-                <option value="">Selecionar produto...</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — {formatCurrency(p.salePrice)}
-                  </option>
-                ))}
-              </select>
+              <SearchableSelect
+                placeholder="Selecionar produto..."
+                value={form.productId}
+                onChange={(val) => {
+                  const prod = products.find(p => p.id === val);
+                  setForm((f) => ({ ...f, productId: val, customPrice: prod ? prod.salePrice : '' }));
+                }}
+                options={products.map(p => ({ 
+                  value: p.id, 
+                  label: p.name, 
+                  sublabel: formatCurrency(p.salePrice) 
+                }))}
+                required
+              />
             </div>
             <div>
               <label className="label">Tamanho / Num.</label>
