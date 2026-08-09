@@ -47,6 +47,7 @@ export const createSale = async (saleData) => {
     paymentMethod,
     date,
     weekLabel,
+    size,
   } = saleData;
 
   const cost = Number(costPrice) || 0;
@@ -58,16 +59,11 @@ export const createSale = async (saleData) => {
   const saleDate = date ? Timestamp.fromDate(new Date(date)) : serverTimestamp();
 
   await runTransaction(db, async (transaction) => {
-    // 1. Check and decrement stock
+    // 1. Check if product exists
     const productRef = doc(db, PRODUCTS_COLLECTION, productId);
     const productSnap = await transaction.get(productRef);
 
     if (!productSnap.exists()) throw new Error('Produto não encontrado.');
-
-    const currentStock = productSnap.data().stock || 0;
-    if (currentStock <= 0) throw new Error('Produto sem estoque disponível.');
-
-    transaction.update(productRef, { stock: currentStock - 1, updatedAt: serverTimestamp() });
 
     // 2. Create sale document
     const saleRef = doc(collection(db, SALES_COLLECTION));
@@ -76,6 +72,7 @@ export const createSale = async (saleData) => {
       customerName,
       productId,
       productName,
+      size: size || '',
       costPrice: cost,
       salePrice: price,
       profit,

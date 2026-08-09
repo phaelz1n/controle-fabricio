@@ -56,6 +56,7 @@ const Sales = () => {
     paymentMethod: 'PIX',
     date: new Date().toISOString().split('T')[0],
     weekLabel: getCurrentWeekLabel(),
+    size: '',
   });
 
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -114,7 +115,6 @@ const Sales = () => {
     if (!form.customerId) { toast.error('Selecione um cliente.'); return; }
     if (!form.productId) { toast.error('Selecione um produto.'); return; }
     if (!selectedProduct) return;
-    if (selectedProduct.stock <= 0) { toast.error('Produto sem estoque disponível!'); return; }
     setSubmitting(true);
     try {
 
@@ -123,11 +123,11 @@ const Sales = () => {
         productId: form.productId, productName: selectedProduct.name,
         costPrice: selectedProduct.costPrice, salePrice: selectedProduct.salePrice,
         amountPaid: form.amountPaid, paymentMethod: form.paymentMethod,
-        date: form.date, weekLabel: form.weekLabel,
+        date: form.date, weekLabel: form.weekLabel, size: form.size,
       });
       toast.success('Venda registrada com sucesso!');
       setNewSaleModal(false);
-      setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel() });
+      setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), size: '' });
     } catch (err) {
       toast.error(err.message || 'Erro ao registrar venda.');
     } finally {
@@ -185,7 +185,12 @@ const Sales = () => {
   const columns = [
     { key: 'date', label: 'Data', render: (row) => <span className="text-slate-400 text-xs">{formatDate(row.date || row.createdAt)}</span> },
     { key: 'customerName', label: 'Cliente', render: (row) => <span className="font-medium text-slate-200">{row.customerName}</span> },
-    { key: 'productName', label: 'Produto', render: (row) => <span className="text-slate-400">{row.productName}</span> },
+    { key: 'productName', label: 'Produto', render: (row) => (
+      <div>
+        <span className="text-slate-400 block">{row.productName}</span>
+        {row.size && <span className="px-2 py-0.5 bg-slate-800 text-slate-400 text-xs rounded-lg border border-slate-700 inline-block mt-0.5">Tam: {row.size}</span>}
+      </div>
+    )},
     { key: 'salePrice', label: 'Valor', render: (row) => <span className="text-slate-200">{formatCurrency(row.salePrice)}</span> },
     { key: 'amountPaid', label: 'Pago', render: (row) => <span className="text-emerald-400 font-medium">{formatCurrency(row.amountPaid)}</span> },
     { key: 'remainingBalance', label: 'Restante', render: (row) => <span className={row.remainingBalance > 0 ? 'text-amber-400' : 'text-slate-500'}>{formatCurrency(row.remainingBalance)}</span> },
@@ -292,17 +297,24 @@ const Sales = () => {
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <div>
-            <label className="label">Produto *</label>
-            <select className="input-field" value={form.productId}
-              onChange={(e) => setForm((f) => ({ ...f, productId: e.target.value }))} required>
-              <option value="">Selecionar produto...</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id} disabled={p.stock <= 0}>
-                  {p.name} {p.stock <= 0 ? '(sem estoque)' : `— ${p.stock} par${p.stock !== 1 ? 'es' : ''} — ${formatCurrency(p.salePrice)}`}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="sm:col-span-2">
+              <label className="label">Produto *</label>
+              <select className="input-field" value={form.productId}
+                onChange={(e) => setForm((f) => ({ ...f, productId: e.target.value }))} required>
+                <option value="">Selecionar produto...</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {formatCurrency(p.salePrice)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Tamanho / Num.</label>
+              <input className="input-field" placeholder="ex: 38" value={form.size}
+                onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))} />
+            </div>
           </div>
           {selectedProduct && (
             <div className="grid grid-cols-3 gap-2 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
@@ -317,7 +329,7 @@ const Sales = () => {
               value={form.amountPaid} onChange={(e) => setForm((f) => ({ ...f, amountPaid: e.target.value }))} />
           </div>
           {selectedProduct && (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div className="p-2.5 bg-slate-800/50 rounded-xl text-center">
                 <p className="text-xs text-slate-500">Restante</p>
                 <p className={`text-sm font-bold ${remaining > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{formatCurrency(remaining)}</p>
@@ -325,10 +337,6 @@ const Sales = () => {
               <div className="p-2.5 bg-slate-800/50 rounded-xl text-center">
                 <p className="text-xs text-slate-500 mb-1">Status</p>
                 <StatusBadge status={payStatus} />
-              </div>
-              <div className="p-2.5 bg-slate-800/50 rounded-xl text-center">
-                <p className="text-xs text-slate-500">Estoque após</p>
-                <p className="text-sm font-bold text-slate-300">{(selectedProduct.stock - 1)} {selectedProduct.stock - 1 === 1 ? 'par' : 'pares'}</p>
               </div>
             </div>
           )}

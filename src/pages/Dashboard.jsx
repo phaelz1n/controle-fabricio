@@ -92,25 +92,10 @@ const Dashboard = () => {
     const totalGastoCompras = purchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
     const totalRecebido = sales.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
     
-    // For information purposes, keep current inventory value
-    const custoEstoqueAtual = products.reduce((sum, p) => sum + (p.costPrice || 0) * (p.stock || 0), 0);
-    
-    const aReceber = sales.reduce((sum, s) => sum + (s.remainingBalance || 0), 0);
-    const lucroRealizado = sales.reduce((sum, s) => {
-      const paid = s.amountPaid || 0;
-      const cost = s.costPrice || 0;
-      if (paid <= 0) return sum;
-      const ratio = s.salePrice > 0 ? Math.min(paid / s.salePrice, 1) : 0;
-      return sum + paid - cost * ratio;
-    }, 0);
-    
     const caixaAtual = capitalInicial - totalGastoCompras + totalRecebido;
     
-    const lowStock = products.filter((p) => p.stock <= 2 && p.stock > 0);
-    const outOfStock = products.filter((p) => p.stock === 0);
-    
-    return { custoEstoqueAtual, totalRecebido, totalGastoCompras, aReceber, lucroRealizado, caixaAtual, lowStock, outOfStock };
-  }, [sales, products, purchases, capitalInicial]);
+    return { totalRecebido, totalGastoCompras, aReceber, lucroRealizado, caixaAtual };
+  }, [sales, purchases, capitalInicial]);
 
   // ── Top Compradores ───────────────────────────────────────────────────
   const topBuyers = useMemo(() => {
@@ -180,19 +165,11 @@ const Dashboard = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="p-4 bg-slate-800/60 rounded-xl border border-slate-700/50">
             <p className="text-xs text-slate-500 mb-1">Capital Investido</p>
             <p className="text-lg font-bold text-slate-100">{formatCurrency(capitalInicial)}</p>
             <p className="text-xs text-slate-600 mt-1">Dinheiro que você entrou</p>
-          </div>
-          <div className="p-4 bg-rose-500/5 rounded-xl border border-rose-500/15">
-            <div className="flex items-center gap-1 mb-1">
-              <ArrowDownRight size={13} className="text-rose-400" />
-              <p className="text-xs text-rose-400/80">Estoque em Mãos</p>
-            </div>
-            <p className="text-lg font-bold text-rose-300">{formatCurrency(finance.custoEstoqueAtual)}</p>
-            <p className="text-xs text-slate-600 mt-1">{products.filter((p) => p.stock > 0).length} modelo(s) em estoque</p>
           </div>
           <div className="p-4 bg-amber-500/5 rounded-xl border border-amber-500/15">
             <div className="flex items-center gap-1 mb-1">
@@ -225,11 +202,10 @@ const Dashboard = () => {
       </div>
 
       {/* ── KPI CARDS ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <MetricCard title="Total Recebido" value={formatCurrency(finance.totalRecebido)} icon={DollarSign} color="violet" subtitle={`${sales.length} venda(s) no total`} />
         <MetricCard title="Lucro Realizado" value={formatCurrency(finance.lucroRealizado)} icon={TrendingUp} color="emerald" subtitle="Receita menos custo das vendas pagas" />
         <MetricCard title="A Receber" value={formatCurrency(finance.aReceber)} icon={Clock} color="amber" subtitle={`${sales.filter((s) => s.paymentStatus !== 'Total Pago').length} vendas em aberto`} />
-        <MetricCard title="Custo em Estoque" value={formatCurrency(finance.custoEstoqueAtual)} icon={Package} color="blue" subtitle={`${products.filter((p) => p.stock > 0).length} produtos disponíveis`} />
       </div>
 
       {/* ── TOP COMPRADORES + LEMBRETES ── */}
@@ -377,43 +353,17 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ── GRÁFICO + ESTOQUE BAIXO ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="glass-card p-5 xl:col-span-2">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-200">Receita & Lucro por Semana</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Evolução das últimas semanas</p>
-            </div>
+      {/* ── GRÁFICO ── */}
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-200">Receita & Lucro por Semana</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Evolução das últimas semanas</p>
           </div>
-          {chartData.length > 0 ? <RevenueChart data={chartData} /> : (
-            <div className="h-64 flex items-center justify-center text-slate-500 text-sm">Nenhum dado para exibir ainda</div>
-          )}
         </div>
-
-        <div className="glass-card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle size={16} className="text-amber-400" />
-            <h3 className="text-sm font-semibold text-slate-200">Estoque Baixo</h3>
-          </div>
-          {finance.lowStock.length === 0 && finance.outOfStock.length === 0 ? (
-            <p className="text-sm text-slate-500">Todos os produtos com estoque OK</p>
-          ) : (
-            <div className="space-y-2.5">
-              {[...finance.outOfStock, ...finance.lowStock].slice(0, 6).map((p) => (
-                <div key={p.id} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-300 truncate">{p.name}</p>
-                    <p className="text-xs text-slate-500">{p.category || '—'}</p>
-                  </div>
-                  <span className={`ml-2 text-xs font-bold px-2 py-1 rounded-lg ${p.stock === 0 ? 'bg-rose-500/15 text-rose-400' : 'bg-amber-500/15 text-amber-400'}`}>
-                    {p.stock === 0 ? 'Sem estoque' : `${p.stock} par${p.stock !== 1 ? 'es' : ''}`}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {chartData.length > 0 ? <RevenueChart data={chartData} /> : (
+          <div className="h-64 flex items-center justify-center text-slate-500 text-sm">Nenhum dado para exibir ainda</div>
+        )}
       </div>
 
       {/* ── ÚLTIMAS VENDAS ── */}
@@ -448,7 +398,10 @@ const Dashboard = () => {
                   <tr key={s.id} className="table-row">
                     <td className="py-3 text-slate-400 text-xs">{formatDate(s.date || s.createdAt)}</td>
                     <td className="py-3 text-slate-300 font-medium">{s.customerName}</td>
-                    <td className="py-3 text-slate-400">{s.productName}</td>
+                    <td className="py-3 text-slate-400">
+                      {s.productName}
+                      {s.size && <span className="ml-2 px-1.5 py-0.5 bg-slate-800 text-xs rounded border border-slate-700">Tam: {s.size}</span>}
+                    </td>
                     <td className="py-3 text-right text-slate-300">{formatCurrency(s.salePrice)}</td>
                     <td className="py-3 text-right text-emerald-400 font-medium">{formatCurrency(s.amountPaid)}</td>
                     <td className="py-3 text-right text-amber-400">{formatCurrency(s.remainingBalance)}</td>

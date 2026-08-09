@@ -29,6 +29,7 @@ const EMPTY_FORM = {
   notes: '',
   date: new Date().toISOString().split('T')[0],
   updateCostPrice: false,
+  size: '',
 };
 
 const Purchases = () => {
@@ -56,9 +57,8 @@ const Purchases = () => {
   const metrics = useMemo(() => {
     const totalInvested = purchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
     const totalUnits = purchases.reduce((sum, p) => sum + (p.quantity || 0), 0);
-    const currentStockCost = products.reduce((sum, p) => sum + (p.costPrice || 0) * (p.stock || 0), 0);
-    return { totalInvested, totalUnits, currentStockCost };
-  }, [purchases, products]);
+    return { totalInvested, totalUnits };
+  }, [purchases]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -101,11 +101,14 @@ const Purchases = () => {
     },
     {
       key: 'quantity',
-      label: 'Qtd',
+      label: 'Qtd / Tam',
       render: (row) => (
-        <span className="px-2.5 py-1 bg-violet-500/10 text-violet-300 text-xs font-bold rounded-lg border border-violet-500/20">
-          +{row.quantity} {row.quantity === 1 ? 'par' : 'pares'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-1 bg-violet-500/10 text-violet-300 text-xs font-bold rounded-lg border border-violet-500/20">
+            +{row.quantity} {row.quantity === 1 ? 'par' : 'pares'}
+          </span>
+          {row.size && <span className="px-2 py-0.5 bg-slate-800 text-slate-400 text-xs rounded-lg border border-slate-700">Tam: {row.size}</span>}
+        </div>
       ),
     },
     {
@@ -144,7 +147,7 @@ const Purchases = () => {
       </div>
 
       {/* KPI mini-cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="glass-card p-4 flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
             <TrendingDown size={18} className="text-rose-400" />
@@ -162,63 +165,6 @@ const Purchases = () => {
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pares Comprados</p>
             <p className="text-xl font-bold text-slate-100">{metrics.totalUnits} pares</p>
           </div>
-        </div>
-        <div className="glass-card p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center flex-shrink-0">
-            <Store size={18} className="text-amber-400" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Custo do Estoque Atual</p>
-            <p className="text-xl font-bold text-slate-100">{formatCurrency(metrics.currentStockCost)}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Estoque atual por produto */}
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-slate-200 mb-4 flex items-center gap-2">
-          <Package size={15} className="text-violet-400" />
-          Posição Atual do Estoque
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {products.map((p) => (
-            <div
-              key={p.id}
-              className={`p-3 rounded-xl border transition-all ${
-                p.stock === 0
-                  ? 'bg-rose-500/5 border-rose-500/15'
-                  : p.stock <= 2
-                  ? 'bg-amber-500/5 border-amber-500/15'
-                  : 'bg-slate-800/40 border-slate-700/40'
-              }`}
-            >
-              <p className="text-xs font-medium text-slate-300 truncate">{p.name}</p>
-              <p className="text-xs text-slate-500 mb-2">{p.category || '—'}</p>
-              <div className="flex items-center justify-between">
-                <span
-                  className={`text-sm font-bold ${
-                    p.stock === 0 ? 'text-rose-400' : p.stock <= 2 ? 'text-amber-400' : 'text-emerald-400'
-                  }`}
-                >
-                  {p.stock} {p.stock === 1 ? 'par' : 'pares'}
-                </span>
-                <span className="text-xs text-slate-500">{formatCurrency(p.costPrice)}</span>
-              </div>
-              <div className="mt-2 h-1 bg-slate-800 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    p.stock === 0 ? 'bg-rose-500' : p.stock <= 2 ? 'bg-amber-400' : 'bg-emerald-400'
-                  }`}
-                  style={{ width: `${Math.min(100, (p.stock / 10) * 100)}%` }}
-                />
-              </div>
-            </div>
-          ))}
-          {products.length === 0 && (
-            <p className="col-span-full text-sm text-slate-500 text-center py-6">
-              Nenhum produto cadastrado ainda
-            </p>
-          )}
         </div>
       </div>
 
@@ -272,7 +218,7 @@ const Purchases = () => {
               <option value="">Selecionar produto...</option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} (estoque: {p.stock} {p.stock === 1 ? 'par' : 'pares'})
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -289,27 +235,35 @@ const Purchases = () => {
               <div>
                 <p className="text-sm font-medium text-slate-200">{selectedProduct.name}</p>
                 <p className="text-xs text-slate-400">
-                  Estoque atual: <strong className="text-violet-300">{selectedProduct.stock} {selectedProduct.stock === 1 ? 'par' : 'pares'}</strong>
-                  {' · '}Custo registrado: <strong>{formatCurrency(selectedProduct.costPrice)}</strong>
+                  Custo registrado: <strong>{formatCurrency(selectedProduct.costPrice)}</strong>
                 </p>
               </div>
             </div>
           )}
 
-          {/* Quantidade + Custo */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Quantidade, Tamanho + Custo */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">Quantidade Comprada *</label>
+              <label className="label">Qtd *</label>
               <input
                 type="number" min="1" step="1" className="input-field"
-                placeholder="ex: 3"
+                placeholder="ex: 1"
                 value={form.quantity}
                 onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
                 required
               />
             </div>
             <div>
-              <label className="label">Custo por Par (R$) *</label>
+              <label className="label">Tamanho / Num.</label>
+              <input
+                className="input-field"
+                placeholder="ex: 38"
+                value={form.size}
+                onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="label">Custo / Par *</label>
               <input
                 type="number" min="0" step="0.01" className="input-field"
                 placeholder="0,00"
@@ -395,10 +349,6 @@ const Purchases = () => {
             <div className="p-3 bg-emerald-500/8 border border-emerald-500/20 rounded-xl space-y-1 text-xs">
               <p className="font-semibold text-emerald-300 flex items-center gap-1.5">
                 <CheckCircle size={13} />O que vai acontecer:
-              </p>
-              <p className="text-slate-400">
-                📦 Estoque de <strong className="text-slate-200">"{selectedProduct.name}"</strong>{' '}
-                vai de <span className="text-slate-300">{selectedProduct.stock}</span> → <span className="text-emerald-300 font-bold">{selectedProduct.stock + qty} pares</span>
               </p>
               <p className="text-slate-400">
                 💸 Caixa reduz em <span className="text-rose-300 font-bold">{formatCurrency(totalCost)}</span>

@@ -25,7 +25,6 @@ export const getProductsRealtime = (callback) => {
 export const addProduct = async (data) => {
   return await addDoc(collection(db, COLLECTION), {
     ...data,
-    stock: Number(data.stock) || 0,
     costPrice: Number(data.costPrice) || 0,
     salePrice: Number(data.salePrice) || 0,
     createdAt: serverTimestamp(),
@@ -37,7 +36,6 @@ export const updateProduct = async (id, data) => {
   const ref = doc(db, COLLECTION, id);
   return await updateDoc(ref, {
     ...data,
-    stock: Number(data.stock) || 0,
     costPrice: Number(data.costPrice) || 0,
     salePrice: Number(data.salePrice) || 0,
     updatedAt: serverTimestamp(),

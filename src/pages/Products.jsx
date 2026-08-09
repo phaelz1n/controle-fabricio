@@ -18,7 +18,6 @@ const EMPTY_FORM = {
   category: '',
   costPrice: '',
   salePrice: '',
-  stock: '',
 };
 
 const Products = () => {
@@ -52,7 +51,6 @@ const Products = () => {
       category: product.category || '',
       costPrice: String(product.costPrice || ''),
       salePrice: String(product.salePrice || ''),
-      stock: String(product.stock ?? ''),
     });
     setModalOpen(true);
   };
@@ -125,23 +123,6 @@ const Products = () => {
         const p = (row.salePrice || 0) - (row.costPrice || 0);
         return <span className="text-emerald-400 font-medium">{formatCurrency(p)}</span>;
       },
-    },
-    {
-      key: 'stock',
-      label: 'Estoque',
-      render: (row) => (
-        <span
-          className={`text-sm font-bold px-2.5 py-1 rounded-lg ${
-            row.stock === 0
-              ? 'bg-rose-500/15 text-rose-400'
-              : row.stock <= 2
-              ? 'bg-amber-500/15 text-amber-400'
-              : 'bg-emerald-500/15 text-emerald-400'
-          }`}
-        >
-          {row.stock} {row.stock === 1 ? 'par' : 'pares'}
-        </span>
-      ),
     },
   ];
 
@@ -264,20 +245,6 @@ const Products = () => {
               </span>
             </div>
           )}
-
-          <div>
-            <label className="label">Quantidade em Estoque *</label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              className="input-field"
-              placeholder="0"
-              value={form.stock}
-              onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))}
-              required
-            />
-          </div>
 
           <div className="flex gap-3 pt-2">
             <button

@@ -41,6 +41,7 @@ export const registerPurchase = async (data) => {
     notes,
     date,
     updateCostPrice,
+    size,
   } = data;
 
   const qty = Number(quantity) || 0;
@@ -53,10 +54,8 @@ export const registerPurchase = async (data) => {
     const productSnap = await transaction.get(productRef);
     if (!productSnap.exists()) throw new Error('Produto não encontrado.');
 
-    const currentStock = productSnap.data().stock || 0;
-
-    // Update stock (and optionally cost price)
-    const productUpdate = { stock: currentStock + qty, updatedAt: serverTimestamp() };
+    // Update optionally cost price
+    const productUpdate = { updatedAt: serverTimestamp() };
     if (updateCostPrice && cost > 0) productUpdate.costPrice = cost;
     transaction.update(productRef, productUpdate);
 
@@ -66,6 +65,7 @@ export const registerPurchase = async (data) => {
       productId,
       productName,
       quantity: qty,
+      size: size || '',
       unitCost: cost,
       totalCost: total,
       supplier: supplier || '',
