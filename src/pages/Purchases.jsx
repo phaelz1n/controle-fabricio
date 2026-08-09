@@ -7,7 +7,6 @@ import {
   CalendarDays,
   Store,
   RefreshCw,
-  RefreshCw,
   CheckCircle,
   Pencil,
   Trash2,
@@ -16,7 +15,6 @@ import Modal from '../components/ui/Modal';
 import DataTable from '../components/ui/DataTable';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  getPurchasesRealtime,
   getPurchasesRealtime,
   registerPurchase,
   updatePurchase,

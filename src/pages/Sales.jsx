@@ -7,7 +7,6 @@ import {
   Smartphone,
   Bell,
   BellPlus,
-  BellPlus,
   CheckCircle2,
   Trash2,
   Pencil,
@@ -19,7 +18,6 @@ import { useAuth } from '../contexts/AuthContext';
 
 import {
   getSalesRealtime,
-  createSale,
   createSale,
   registerPayment,
   updateSale,
@@ -53,7 +51,6 @@ const Sales = () => {
   const [loading, setLoading] = useState(true);
 
   const [newSaleModal, setNewSaleModal] = useState(false);
-  const [paymentModal, setPaymentModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
   const [reminderModal, setReminderModal] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
