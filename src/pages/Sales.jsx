@@ -40,6 +40,7 @@ const PAYMENT_METHODS = [
 const STATUS_FILTERS = ['Todos', 'Pendente', 'Pago Parcial', 'Total Pago'];
 
 const Sales = () => {
+  const { user } = useAuth();
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
