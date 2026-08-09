@@ -18,6 +18,7 @@ import {
   CalendarClock,
   Printer,
   Filter,
+  Plus,
 } from 'lucide-react';
 import MetricCard from '../components/ui/MetricCard';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -34,6 +35,11 @@ import {
   toggleReminderDone,
   deleteReminder,
 } from '../services/reminderService';
+import {
+  getExpensesRealtime,
+  registerExpense,
+  deleteExpense,
+} from '../services/expenseService';
 import { formatCurrency, formatDate, formatShortDate, getInitials } from '../utils/formatters';
 import toast from 'react-hot-toast';
 
@@ -46,13 +52,19 @@ const Dashboard = () => {
   const [purchases, setPurchases] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [loadingSales, setLoadingSales] = useState(true);
-
+  const [expenses, setExpenses] = useState([]);
+  
   // Capital settings
   const [capitalInicial, setCapitalInicial] = useState(0);
   const [capitalModal, setCapitalModal] = useState(false);
   const [capitalInput, setCapitalInput] = useState('');
   const [savingCapital, setSavingCapital] = useState(false);
   const [dateFilter, setDateFilter] = useState('all');
+
+  // Expense modal state
+  const [expenseModal, setExpenseModal] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({ description: '', amount: '', date: new Date().toISOString().split('T')[0] });
+  const [submittingExpense, setSubmittingExpense] = useState(false);
 
   // Load data
   useEffect(() => {
@@ -61,8 +73,9 @@ const Dashboard = () => {
     const unsubProducts = getProductsRealtime(setProducts);
     const unsubPurchases = getPurchasesRealtime(setPurchases);
     const unsubReminders = getRemindersRealtime(setReminders);
+    const unsubExpenses = getExpensesRealtime(setExpenses);
     getFinancialSettings().then((s) => { if (s?.capitalInicial) setCapitalInicial(Number(s.capitalInicial)); });
-    return () => { unsubSales(); unsubProducts(); unsubPurchases(); unsubReminders(); };
+    return () => { unsubSales(); unsubProducts(); unsubPurchases(); unsubReminders(); unsubExpenses(); };
   }, [user]);
 
   const handleSaveCapital = async (e) => {
@@ -90,6 +103,30 @@ const Dashboard = () => {
     toast.success('Lembrete removido!');
   };
 
+  const handleAddExpense = async (e) => {
+    e.preventDefault();
+    setSubmittingExpense(true);
+    try {
+      await registerExpense(expenseForm);
+      toast.success('Gasto extra registrado!');
+      setExpenseModal(false);
+      setExpenseForm({ description: '', amount: '', date: new Date().toISOString().split('T')[0] });
+    } catch {
+      toast.error('Erro ao registrar gasto.');
+    } finally {
+      setSubmittingExpense(false);
+    }
+  };
+
+  const handleDeleteExpense = async (id) => {
+    try {
+      await deleteExpense(id);
+      toast.success('Gasto removido!');
+    } catch {
+      toast.error('Erro ao remover gasto.');
+    }
+  };
+
   // ── Filtros ──────────────────────────────────────────────────────────
   const filteredSales = useMemo(() => {
     const today = new Date();
@@ -115,9 +152,22 @@ const Dashboard = () => {
     });
   }, [purchases, dateFilter]);
 
+  const filteredExpenses = useMemo(() => {
+    const today = new Date();
+    return expenses.filter((e) => {
+      if (dateFilter === 'all') return true;
+      const d = new Date(e.date || e.createdAt);
+      if (dateFilter === 'today') return d.toDateString() === today.toDateString();
+      if (dateFilter === 'month') return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+      if (dateFilter === 'year') return d.getFullYear() === today.getFullYear();
+      return true;
+    });
+  }, [expenses, dateFilter]);
+
   // ── Financial calculations ────────────────────────────────────────────
   const finance = useMemo(() => {
     const totalGastoCompras = filteredPurchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+    const totalGastosExtras = filteredExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
     const totalRecebido = filteredSales.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
     
     const aReceber = filteredSales.reduce((sum, s) => sum + (s.remainingBalance || 0), 0);
@@ -129,10 +179,10 @@ const Dashboard = () => {
       return sum + paid - cost * ratio;
     }, 0);
     
-    const caixaAtual = capitalInicial - totalGastoCompras + totalRecebido;
+    const caixaAtual = capitalInicial - totalGastoCompras - totalGastosExtras + totalRecebido;
     
-    return { totalRecebido, totalGastoCompras, aReceber, lucroRealizado, caixaAtual };
-  }, [filteredSales, filteredPurchases, capitalInicial]);
+    return { totalRecebido, totalGastoCompras, totalGastosExtras, aReceber, lucroRealizado, caixaAtual };
+  }, [filteredSales, filteredPurchases, filteredExpenses, capitalInicial]);
 
   // ── Top Compradores ───────────────────────────────────────────────────
   const topBuyers = useMemo(() => {
@@ -258,15 +308,18 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="mt-4 px-4 py-3 bg-slate-800/30 rounded-xl border border-slate-800">
+        <div className="mt-4 px-4 py-3 bg-slate-800/30 rounded-xl border border-slate-800 flex flex-col gap-2">
           <p className="text-xs text-slate-500 font-medium mb-1">Como é calculado:</p>
-          <p className="text-xs text-slate-400 font-mono leading-relaxed">
-            <span className="text-slate-200">{formatCurrency(capitalInicial)}</span>{' '}(capital){' '}
-            <span className="text-rose-400">− {formatCurrency(finance.totalGastoCompras)}</span>{' '}(gasto em compras){' '}
-            <span className="text-emerald-400">+ {formatCurrency(finance.totalRecebido)}</span>{' '}(recebido em vendas){' '}
-            <span className="text-slate-500">=</span>{' '}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400 font-mono leading-relaxed">
+            <span><span className="text-slate-200">{formatCurrency(capitalInicial)}</span> (capital)</span>
+            <span className="text-rose-400">− {formatCurrency(finance.totalGastoCompras)} <span className="text-slate-500">(compras)</span></span>
+            {finance.totalGastosExtras > 0 && (
+              <span className="text-rose-400">− {formatCurrency(finance.totalGastosExtras)} <span className="text-slate-500">(extras)</span></span>
+            )}
+            <span className="text-emerald-400">+ {formatCurrency(finance.totalRecebido)} <span className="text-slate-500">(recebido)</span></span>
+            <span className="text-slate-500">=</span>
             <span className={`font-bold ${finance.caixaAtual >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{formatCurrency(finance.caixaAtual)}</span>
-          </p>
+          </div>
         </div>
       </div>
 
@@ -422,6 +475,61 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* ── GASTOS EXTRAS ── */}
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-rose-400" />
+            <div>
+              <h3 className="text-sm font-semibold text-slate-200">Gastos Extras (Despesas)</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Custos que afetam o caixa além da compra de tênis</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setExpenseModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:text-white bg-rose-500 hover:bg-rose-600 rounded-xl transition-all"
+          >
+            <Plus size={13} />
+            Adicionar Despesa
+          </button>
+        </div>
+
+        {filteredExpenses.length === 0 ? (
+          <p className="text-sm text-slate-500 text-center py-6">Nenhum gasto extra registrado.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-800">
+                  <th className="pb-3 text-left table-header">Data</th>
+                  <th className="pb-3 text-left table-header">Descrição</th>
+                  <th className="pb-3 text-right table-header">Valor</th>
+                  <th className="pb-3 text-right table-header"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredExpenses.map((exp) => (
+                  <tr key={exp.id} className="table-row">
+                    <td className="py-3 text-slate-400 text-xs">{formatDate(exp.date)}</td>
+                    <td className="py-3 text-slate-300">{exp.description}</td>
+                    <td className="py-3 text-right text-rose-400 font-medium">{formatCurrency(exp.amount)}</td>
+                    <td className="py-3 text-right">
+                      <button
+                        onClick={() => handleDeleteExpense(exp.id)}
+                        className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                        title="Excluir Gasto"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* ── GRÁFICO ── */}
       <div className="glass-card p-5">
         <div className="flex items-center justify-between mb-5">
@@ -512,6 +620,44 @@ const Dashboard = () => {
             <button type="button" onClick={() => setCapitalModal(false)} className="btn-secondary flex-1">Cancelar</button>
             <button type="submit" disabled={savingCapital} className="btn-primary flex-1">
               {savingCapital ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Salvar'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── MODAL GASTO EXTRA ── */}
+      <Modal isOpen={expenseModal} onClose={() => setExpenseModal(false)} title="Adicionar Gasto Extra / Ajuste" size="sm">
+        <form onSubmit={handleAddExpense} className="space-y-4">
+          <div className="p-3 bg-slate-800/50 rounded-xl text-xs text-slate-400 leading-relaxed mb-2">
+            Use para registrar despesas não relacionadas a estoque (ex: frete extra, embalagens, lanches) ou <strong>ajustes de caixa</strong> para bater com seu banco.
+          </div>
+          <div>
+            <label className="label">Descrição</label>
+            <input 
+              type="text" className="input-field" placeholder="ex: Ajuste de Saldo, Embalagens..."
+              value={expenseForm.description} onChange={(e) => setExpenseForm({...expenseForm, description: e.target.value})} required autoFocus 
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Valor (R$)</label>
+              <input 
+                type="number" min="0" step="0.01" className="input-field" placeholder="0,00"
+                value={expenseForm.amount} onChange={(e) => setExpenseForm({...expenseForm, amount: e.target.value})} required 
+              />
+            </div>
+            <div>
+              <label className="label">Data</label>
+              <input 
+                type="date" className="input-field"
+                value={expenseForm.date} onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})} required 
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => setExpenseModal(false)} className="btn-secondary flex-1">Cancelar</button>
+            <button type="submit" disabled={submittingExpense} className="btn-danger flex-1">
+              {submittingExpense ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Registrar'}
             </button>
           </div>
         </form>

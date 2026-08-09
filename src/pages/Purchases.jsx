@@ -27,13 +27,12 @@ import toast from 'react-hot-toast';
 
 const EMPTY_FORM = {
   productId: '',
-  quantity: '',
   unitCost: '',
   supplier: '',
   notes: '',
   date: new Date().toISOString().split('T')[0],
   updateCostPrice: false,
-  size: '',
+  items: [{ quantity: '', size: '' }],
 };
 
 const Purchases = () => {
@@ -55,7 +54,8 @@ const Purchases = () => {
   }, [user]);
 
   const selectedProduct = products.find((p) => p.id === form.productId);
-  const qty = Number(form.quantity) || 0;
+  const items = form.items || [{ quantity: form.quantity || '', size: form.size || '' }];
+  const qty = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
   const unitCost = Number(form.unitCost) || 0;
   const totalCost = qty * unitCost;
 
@@ -75,13 +75,12 @@ const Purchases = () => {
     }
     setForm({
       productId: purchase.productId || '',
-      quantity: String(purchase.quantity || ''),
       unitCost: String(purchase.unitCost || ''),
       supplier: purchase.supplier || '',
       notes: purchase.notes || '',
       date: dateStr,
       updateCostPrice: false,
-      size: purchase.size || '',
+      items: [{ quantity: String(purchase.quantity || ''), size: purchase.size || '' }],
     });
     setModalOpen(true);
   };
@@ -115,7 +114,15 @@ const Purchases = () => {
       const productName = selectedProduct?.name || '';
 
       if (selectedPurchase) {
-        await updatePurchase(selectedPurchase.id, { ...form, productName, totalCost });
+        // Edit usually only updates one record
+        const itemToUpdate = form.items[0];
+        await updatePurchase(selectedPurchase.id, { 
+          ...form, 
+          quantity: itemToUpdate.quantity,
+          size: itemToUpdate.size,
+          productName, 
+          totalCost 
+        });
         toast.success('Compra atualizada!');
       } else {
         await registerPurchase({ ...form, productName, totalCost });
@@ -310,37 +317,73 @@ const Purchases = () => {
             </div>
           )}
 
-          {/* Quantidade, Tamanho + Custo */}
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="label">Qtd *</label>
-              <input
-                type="number" min="1" step="1" className="input-field"
-                placeholder="ex: 1"
-                value={form.quantity}
-                onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))}
-                required
-              />
+          {/* Variantes (Quantidades e Tamanhos) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="label mb-0">Quantidades e Tamanhos</label>
+              {!selectedPurchase && (
+                <button 
+                  type="button" 
+                  onClick={() => setForm(f => ({ ...f, items: [...(f.items || []), { quantity: '', size: '' }] }))}
+                  className="text-xs text-violet-400 hover:text-violet-300 font-medium flex items-center gap-1"
+                >
+                  <Plus size={14} /> Adicionar Tamanho
+                </button>
+              )}
             </div>
-            <div>
-              <label className="label">Tamanho / Num.</label>
-              <input
-                className="input-field"
-                placeholder="ex: 38"
-                value={form.size}
-                onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="label">Custo / Par *</label>
-              <input
-                type="number" min="0" step="0.01" className="input-field"
-                placeholder="0,00"
-                value={form.unitCost}
-                onChange={(e) => setForm((f) => ({ ...f, unitCost: e.target.value }))}
-                required
-              />
-            </div>
+            
+            {(form.items || []).map((item, index) => (
+              <div key={index} className="flex items-center gap-3">
+                <div className="flex-1">
+                  <input
+                    type="number" min="1" step="1" className="input-field"
+                    placeholder="Qtd (ex: 1)"
+                    value={item.quantity}
+                    onChange={(e) => {
+                      const newItems = [...form.items];
+                      newItems[index].quantity = e.target.value;
+                      setForm(f => ({ ...f, items: newItems }));
+                    }}
+                    required
+                  />
+                </div>
+                <div className="flex-1">
+                  <input
+                    className="input-field"
+                    placeholder="Tam. (ex: 38)"
+                    value={item.size}
+                    onChange={(e) => {
+                      const newItems = [...form.items];
+                      newItems[index].size = e.target.value;
+                      setForm(f => ({ ...f, items: newItems }));
+                    }}
+                  />
+                </div>
+                {!selectedPurchase && form.items.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newItems = form.items.filter((_, i) => i !== index);
+                      setForm(f => ({ ...f, items: newItems }));
+                    }}
+                    className="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-500/10 transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <label className="label">Custo / Par *</label>
+            <input
+              type="number" min="0" step="0.01" className="input-field"
+              placeholder="0,00"
+              value={form.unitCost}
+              onChange={(e) => setForm((f) => ({ ...f, unitCost: e.target.value }))}
+              required
+            />
           </div>
 
           {/* Totals preview */}

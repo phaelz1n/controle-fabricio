@@ -46,11 +46,18 @@ export const registerPurchase = async (data) => {
     date,
     updateCostPrice,
     size,
+    items, // [{ quantity, size }]
   } = data;
 
-  const qty = Number(quantity) || 0;
   const cost = Number(unitCost) || 0;
-  const total = Number(totalCost) || qty * cost;
+  
+  // If items array is provided, use it, otherwise fallback to single quantity/size
+  const purchaseItems = items && items.length > 0 
+    ? items.map(item => ({ qty: Number(item.quantity) || 0, size: item.size || '' }))
+    : [{ qty: Number(quantity) || 0, size: size || '' }];
+    
+  const totalQty = purchaseItems.reduce((acc, item) => acc + item.qty, 0);
+  const total = Number(totalCost) || totalQty * cost;
   const purchaseDate = date ? Timestamp.fromDate(new Date(date)) : serverTimestamp();
 
   await runTransaction(db, async (transaction) => {
@@ -63,28 +70,36 @@ export const registerPurchase = async (data) => {
     if (updateCostPrice && cost > 0) productUpdate.costPrice = cost;
     transaction.update(productRef, productUpdate);
 
-    // Create purchase record
-    const purchaseRef = doc(collection(db, PURCHASES_COL));
-    transaction.set(purchaseRef, {
-      productId,
-      productName,
-      quantity: qty,
-      size: size || '',
-      unitCost: cost,
-      totalCost: total,
-      supplier: supplier || '',
-      notes: notes || '',
-      date: purchaseDate,
-      createdAt: serverTimestamp(),
+    // Create purchase records for each item
+    const purchaseIds = [];
+    purchaseItems.forEach((item) => {
+      if (item.qty <= 0) return;
+      const purchaseRef = doc(collection(db, PURCHASES_COL));
+      purchaseIds.push(purchaseRef.id);
+      transaction.set(purchaseRef, {
+        productId,
+        productName,
+        quantity: item.qty,
+        size: item.size,
+        unitCost: cost,
+        totalCost: item.qty * cost,
+        supplier: supplier || '',
+        notes: notes || '',
+        date: purchaseDate,
+        createdAt: serverTimestamp(),
+      });
     });
+
+    if (purchaseIds.length === 0) throw new Error('Nenhuma quantidade informada.');
 
     // Create cashflow "saída"
     const cashflowRef = doc(collection(db, CASHFLOW_COL));
     transaction.set(cashflowRef, {
       type: 'saida',
       amount: total,
-      description: `Compra: ${qty}x ${productName}`,
-      purchaseId: purchaseRef.id,
+      description: `Compra: ${totalQty}x ${productName}`,
+      purchaseId: purchaseIds[0], // link to first one, or maybe join them
+      purchaseIds: purchaseIds, // store array of ids just in case
       category: 'compra_estoque',
       date: purchaseDate,
       createdAt: serverTimestamp(),
