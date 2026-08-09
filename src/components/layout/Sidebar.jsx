@@ -8,6 +8,7 @@ import {
   TrendingUp,
   ChevronRight,
   ShoppingBag,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -16,6 +17,7 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/produtos', label: 'Produtos', icon: Package },
   { to: '/compras', label: 'Compras', icon: ShoppingBag },
+  { to: '/despesas', label: 'Despesas', icon: Wallet },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/vendas', label: 'Vendas', icon: ShoppingCart },
 ];

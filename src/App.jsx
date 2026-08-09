@@ -9,6 +9,7 @@ import Products from './pages/Products';
 import Customers from './pages/Customers';
 import Sales from './pages/Sales';
 import Purchases from './pages/Purchases';
+import Expenses from './pages/Expenses';
 
 const App = () => {
   return (
@@ -42,6 +43,7 @@ const App = () => {
               <Route path="/clientes" element={<Customers />} />
               <Route path="/vendas" element={<Sales />} />
               <Route path="/compras" element={<Purchases />} />
+              <Route path="/despesas" element={<Expenses />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
