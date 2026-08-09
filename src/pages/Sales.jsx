@@ -63,6 +63,7 @@ const Sales = () => {
     date: new Date().toISOString().split('T')[0],
     weekLabel: getCurrentWeekLabel(),
     size: '',
+    customPrice: '',
   });
 
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -85,7 +86,7 @@ const Sales = () => {
   const selectedCustomer = customers.find((c) => c.id === form.customerId);
 
   const amountPaid = Number(form.amountPaid) || 0;
-  const salePrice = selectedProduct?.salePrice || 0;
+  const salePrice = form.customPrice !== '' ? Number(form.customPrice) : (selectedProduct?.salePrice || 0);
   const costPrice = selectedProduct?.costPrice || 0;
   const remaining = Math.max(0, salePrice - amountPaid);
   const profit = salePrice - costPrice;
@@ -131,6 +132,7 @@ const Sales = () => {
       date: dateStr,
       weekLabel: sale.weekLabel || '',
       size: sale.size || '',
+      customPrice: String(sale.salePrice || ''),
     });
     setNewSaleModal(true);
   };
@@ -163,7 +165,7 @@ const Sales = () => {
       const data = {
         customerId: form.customerId, customerName: selectedCustomer?.name || '',
         productId: form.productId, productName: selectedProduct.name,
-        costPrice: selectedProduct.costPrice, salePrice: selectedProduct.salePrice,
+        costPrice: selectedProduct.costPrice, salePrice: salePrice,
         amountPaid: form.amountPaid, paymentMethod: form.paymentMethod,
         date: form.date, weekLabel: form.weekLabel, size: form.size,
       };
@@ -176,7 +178,7 @@ const Sales = () => {
         toast.success('Venda registrada com sucesso!');
       }
       setNewSaleModal(false);
-      setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), size: '' });
+      setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), size: '', customPrice: '' });
       setSelectedSaleForEdit(null);
     } catch (err) {
       toast.error(err.message || 'Erro ao registrar venda.');
@@ -255,7 +257,7 @@ const Sales = () => {
           <h2 className="text-xl font-bold text-slate-100">Vendas</h2>
           <p className="text-sm text-slate-400 mt-0.5">{sales.length} venda{sales.length !== 1 ? 's' : ''} registrada{sales.length !== 1 ? 's' : ''}</p>
         </div>
-        <button id="btn-add-sale" onClick={() => { setSelectedSaleForEdit(null); setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), size: '' }); setNewSaleModal(true); }} className="btn-primary">
+        <button id="btn-add-sale" onClick={() => { setSelectedSaleForEdit(null); setForm({ customerId: '', productId: '', amountPaid: '', paymentMethod: 'PIX', date: new Date().toISOString().split('T')[0], weekLabel: getCurrentWeekLabel(), size: '', customPrice: '' }); setNewSaleModal(true); }} className="btn-primary">
           <Plus size={16} />Nova Venda
         </button>
       </div>
@@ -366,7 +368,11 @@ const Sales = () => {
             <div className="sm:col-span-2">
               <label className="label">Produto *</label>
               <select className="input-field" value={form.productId}
-                onChange={(e) => setForm((f) => ({ ...f, productId: e.target.value }))} required>
+                onChange={(e) => {
+                  const pId = e.target.value;
+                  const prod = products.find(p => p.id === pId);
+                  setForm((f) => ({ ...f, productId: pId, customPrice: prod ? prod.salePrice : '' }));
+                }} required>
                 <option value="">Selecionar produto...</option>
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -382,11 +388,33 @@ const Sales = () => {
             </div>
           </div>
           {selectedProduct && (
-            <div className="grid grid-cols-3 gap-2 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-              <div className="text-center"><p className="text-xs text-slate-500">Custo</p><p className="text-sm font-semibold text-slate-300">{formatCurrency(costPrice)}</p></div>
-              <div className="text-center"><p className="text-xs text-slate-500">Venda</p><p className="text-sm font-semibold text-violet-300">{formatCurrency(salePrice)}</p></div>
-              <div className="text-center"><p className="text-xs text-slate-500">Lucro</p><p className="text-sm font-semibold text-emerald-400">{formatCurrency(profit)}</p></div>
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Preço de Venda (R$)</label>
+                  <input type="number" min="0" step="0.01" className="input-field" 
+                    value={form.customPrice} 
+                    onChange={(e) => setForm(f => ({...f, customPrice: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label">Margem (%)</label>
+                  <input type="number" step="0.1" className="input-field" 
+                    value={costPrice > 0 ? ((salePrice - costPrice) / costPrice * 100).toFixed(1) : ''}
+                    onChange={(e) => {
+                      const newMargin = Number(e.target.value);
+                      const newPrice = costPrice + (costPrice * newMargin / 100);
+                      setForm(f => ({...f, customPrice: newPrice.toFixed(2)}));
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                <div className="text-center"><p className="text-xs text-slate-500">Custo</p><p className="text-sm font-semibold text-slate-300">{formatCurrency(costPrice)}</p></div>
+                <div className="text-center"><p className="text-xs text-slate-500">Venda</p><p className="text-sm font-semibold text-violet-300">{formatCurrency(salePrice)}</p></div>
+                <div className="text-center"><p className="text-xs text-slate-500">Lucro</p><p className="text-sm font-semibold text-emerald-400">{formatCurrency(profit)}</p></div>
+              </div>
+            </>
           )}
           <div>
             <label className="label">Cliente Pagou (R$)</label>
